@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agentira - マルチエージェント工場シミュレーション</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@300;400;700&family=Noto+Sans+JP:wght@300;400;700&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body { 
+            font-family: 'Noto Sans JP', 'Roboto Mono', monospace; 
+            line-height: 1.6; 
+            color: #e0e0e0; 
+            background: #1a1a1a;
+            background-image: 
+                linear-gradient(45deg, rgba(255,255,255,.02) 25%, transparent 25%), 
+                linear-gradient(-45deg, rgba(255,255,255,.02) 25%, transparent 25%);
+            background-size: 20px 20px;
+        }
+        
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+        
+        header { 
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 50%, #3d566e 100%);
+            border-bottom: 4px solid #e74c3c;
+            padding: 2rem 0; 
+            text-align: center; 
+            position: relative;
+        }
+        
+        header::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M20 20c0 11.046-8.954 20-20 20v-40c11.046 0 20 8.954 20 20z'/%3E%3C/g%3E%3C/svg%3E");
+        }
+        
+        h1 { 
+            font-size: 3rem; 
+            margin-bottom: 0.5rem; 
+            color: #ffffff;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 700;
+            letter-spacing: 2px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .subtitle { 
+            font-size: 1.2rem; 
+            opacity: 0.9; 
+            position: relative;
+            z-index: 1;
+        }
+        
+        .section { 
+            padding: 3rem 0; 
+            border-bottom: 1px solid #34495e;
+        }
+        
+        .section:nth-child(even) { background-color: rgba(52, 73, 94, 0.1); }
+        
+        h2 { 
+            font-size: 2rem; 
+            margin-bottom: 1rem; 
+            color: #3498db;
+            font-family: 'Roboto Mono', monospace;
+            border-left: 4px solid #e74c3c;
+            padding-left: 1rem;
+        }
+        
+        .grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
+            gap: 2rem; 
+            margin-top: 2rem; 
+        }
+        
+        .card { 
+            background: linear-gradient(145deg, #2c3e50, #34495e);
+            border: 2px solid #3498db;
+            padding: 1.5rem; 
+            border-radius: 8px; 
+            box-shadow: 
+                0 4px 15px rgba(0,0,0,0.3),
+                inset 0 1px 0 rgba(255,255,255,0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; right: 0;
+            width: 20px; height: 20px;
+            background: #e74c3c;
+            clip-path: polygon(0 0, 100% 0, 100% 100%);
+        }
+        
+        .card h3 { 
+            color: #f39c12; 
+            margin-bottom: 1rem;
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 700;
+        }
+        
+        .highlight { 
+            background: linear-gradient(135deg, rgba(231, 76, 60, 0.2), rgba(52, 152, 219, 0.2));
+            border: 2px solid #3498db;
+            padding: 1.5rem; 
+            border-radius: 8px; 
+            margin: 2rem 0;
+            position: relative;
+        }
+        
+        .highlight::before {
+            content: '⚠️';
+            position: absolute;
+            top: -10px; left: 20px;
+            background: #e74c3c;
+            padding: 5px 15px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+        }
+        
+        ul { list-style: none; }
+        
+        li { 
+            margin: 0.5rem 0; 
+            padding-left: 2rem; 
+            position: relative;
+            font-family: 'Noto Sans JP', sans-serif;
+        }
+        
+        li:before { 
+            content: "▶"; 
+            color: #f39c12; 
+            position: absolute; 
+            left: 0;
+            font-size: 1.2rem;
+        }
+        
+        .status-badge { 
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+            color: white; 
+            padding: 0.5rem 1.5rem; 
+            border-radius: 25px; 
+            font-size: 0.9rem;
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 2px 10px rgba(231, 76, 60, 0.3);
+            position: relative;
+            z-index: 1;
+        }
+        
+        .progress-bar {
+            background: #34495e;
+            border-radius: 10px;
+            padding: 3px;
+            margin: 1rem 0;
+        }
+        
+        .progress-fill {
+            background: linear-gradient(90deg, #f39c12, #e67e22);
+            height: 20px;
+            border-radius: 7px;
+            width: 25%;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+            animation: shimmer 2s infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+        
+        .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .tech-item {
+            background: #2c3e50;
+            border: 1px solid #3498db;
+            padding: 1rem;
+            text-align: center;
+            border-radius: 4px;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+        
+        .tech-item:hover {
+            background: #34495e;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+        }
+        
+        footer { 
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            border-top: 4px solid #e74c3c;
+            color: #ecf0f1; 
+            text-align: center; 
+            padding: 2rem 0; 
+        }
+        
+        a { color: #3498db; text-decoration: none; }
+        a:hover { color: #5dade2; }
+        
+        .lang-switcher {
+            position: absolute;
+            top: 20px; right: 20px;
+            z-index: 10;
+        }
+        
+        .lang-switcher a {
+            background: rgba(0,0,0,0.3);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            margin: 0 0.25rem;
+            font-family: 'Roboto Mono', monospace;
+        }
+        
+        .japanese-emphasis {
+            color: #f39c12;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="lang-switcher">
+            <a href="index.html">EN</a>
+            <a href="index_ja.html" style="background: #e74c3c;">JP</a>
+        </div>
+        <div class="container">
+            <h1>Agentira</h1>
+            <p class="subtitle">教育用マルチエージェント工場シミュレーション</p>
+            <span class="status-badge">🚧 開発中</span>
+        </div>
+    </header>
+
+    <section class="section">
+        <div class="container">
+            <h2>Agentira とは？</h2>
+            <div class="highlight">
+                <p><strong class="japanese-emphasis">Agentira</strong> は、AIエージェントの相互作用と工場自動化のコンセプトを教える教育用シリアスゲームです。Factorioのようなゲームにインスパイアされ、学生が対話的なゲームプレイを通じて複雑なAIコンセプトを学習できるビジュアル環境を提供します。</p>
+            </div>
+            
+            <div class="grid">
+                <div class="card">
+                    <h3>🤖 マルチエージェントシステム</h3>
+                    <p>複数のAIエージェントが共有環境でどのように相互作用、協力、競合するかを学習。シンプルなルールから創発する行動を理解。</p>
+                </div>
+                <div class="card">
+                    <h3>🏭 工場自動化</h3>
+                    <p>ゲーム化された環境でリソース管理、プロセス最適化、ワークフロー自動化を体験。</p>
+                </div>
+                <div class="card">
+                    <h3>📚 教育重視</h3>
+                    <p>AI教育専用設計。ビジュアルで実践的な学習により、複雑なコンセプトをアクセシブルに。</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="container">
+            <h2>プロジェクト背景</h2>
+            <p>このプロジェクトは、AIエージェント開発のためのシリアスゲーミングプラットフォームに関する研究から生まれました。ゲーム環境が複雑なAIコンセプトにアクセシブルな学習体験をどのように提供できるかを検証しています。</p>
+            
+            <div class="grid">
+                <div class="card">
+                    <h3>研究基盤</h3>
+                    <p>Factorio Learning Environment（FLE）と、成長するシリアスゲーム市場（2032年までに$67B予測）からインスピレーション。</p>
+                </div>
+                <div class="card">
+                    <h3>教育仮説</h3>
+                    <p>「Agentiraのようなゲーム環境は、AIエージェント開発教育におけるアクセシビリティ問題を効果的に解決できる」</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="container">
+            <h2>学習目標</h2>
+            <ul>
+                <li>エージェントの行動と意思決定プロセスの理解</li>
+                <li>リソース管理と最適化戦略</li>
+                <li>システム設計とボトルネックの特定</li>
+                <li>協調的・競合的なエージェント相互作用</li>
+                <li>シンプルなルールから複雑な行動の創発</li>
+                <li>マルチエージェントシステムの実世界応用</li>
+            </ul>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="container">
+            <h2>重要コンセプト</h2>
+            <div class="grid">
+                <div class="card">
+                    <h3>エージェント協調</h3>
+                    <p>輸送エージェントと生産エージェントが連携し、工場のスループットを最適化。</p>
+                </div>
+                <div class="card">
+                    <h3>リソース競合</h3>
+                    <p>限られたリソースを巡る複数エージェントの競争。紛争解決と優先度システムを学習。</p>
+                </div>
+                <div class="card">
+                    <h3>創発知能</h3>
+                    <p>個々の単純なエージェントルールから、複雑な工場行動が創発。</p>
+                </div>
+                <div class="card">
+                    <h3>システム最適化</h3>
+                    <p>ボトルネック特定、生産ライン均衡、全体効率向上。</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="container">
+            <h2>技術スタック</h2>
+            <div class="tech-grid">
+                <div class="tech-item">Python</div>
+                <div class="tech-item">JavaScript</div>
+                <div class="tech-item">Canvas/WebGL</div>
+                <div class="tech-item">AI/ML</div>
+                <div class="tech-item">WebSockets</div>
+                <div class="tech-item">Docker</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="container">
+            <h2>開発進捗</h2>
+            <div class="highlight">
+                <h3>現在のフェーズ：研究・設計</h3>
+                <div class="progress-bar">
+                    <div class="progress-fill"></div>
+                </div>
+                <ul>
+                    <li>プロジェクトアーキテクチャ定義 ✅</li>
+                    <li>教育フレームワーク設計 🚧</li>
+                    <li>エージェント行動モデリング 📋</li>
+                    <li>プロトタイプ開発 📋</li>
+                    <li>教育コンテンツ作成 📋</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 CycleTree Organization | AI教育研究プロジェクト</p>
+            <p><a href="https://github.com/CycleTree/Agentira">GitHub で表示</a></p>
+        </div>
+    </footer>
+</body>
+</html>
