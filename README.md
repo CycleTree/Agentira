@@ -2,6 +2,8 @@
 
 Multi-agent factory simulation game for educational purposes.
 
+🌐 **Website**: [cycletree.github.io/Agentira](https://cycletree.github.io/Agentira) *(coming soon)*
+
 ## Overview
 
 Agentira is an educational serious game that teaches AI agent interaction and factory automation concepts. Inspired by games like Factorio, it provides a visual environment where students can learn about:
