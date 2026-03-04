@@ -6,6 +6,12 @@ edition = "2021"
 [dependencies]
 bevy = "0.15"
 
+# WASM用にgetrandomのjs feature有効化
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.3", features = ["wasm_js"] }
+wasm-bindgen = "0.2"
+web-sys = { version = "0.3", features = ["Window"] }
+
 # 最適化設定
 [profile.dev]
 opt-level = 1

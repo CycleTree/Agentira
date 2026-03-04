@@ -1,0 +1,7 @@
+[target.wasm32-unknown-unknown]
+rustflags = ["--cfg", "getrandom_backend=\"wasm_js\""]
+
+[build]
+# WASM向けビルド時の最適化
+[profile.release]
+opt-level = "s"
