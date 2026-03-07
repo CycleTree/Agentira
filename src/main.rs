@@ -272,7 +272,7 @@ fn spawn_trees(
 fn spawn_tree(
     commands: &mut Commands,
     meshes: &mut ResMut<Assets<Mesh>>,
-    materials: &mut ResMut<Assets<StandardMaterial>>,
+    _materials: &mut ResMut<Assets<StandardMaterial>>,
     position: Vec3,
     trunk_material: &Handle<StandardMaterial>,
     leaves_material: &Handle<StandardMaterial>,
@@ -364,7 +364,8 @@ fn woodcutter_behavior(
             }) {
                 let look_dir = (chest_transform.translation - transform.translation).normalize_or_zero();
                 if look_dir.length() > 0.01 {
-                    transform.look_at(transform.translation + look_dir, Vec3::Y);
+                    let target_pos = transform.translation + look_dir;
+                    transform.look_at(target_pos, Vec3::Y);
                 }
             }
         }
