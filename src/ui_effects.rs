@@ -81,13 +81,18 @@ pub fn update_particle_effects(
         }
         
         // パーティクルの位置更新
-        if let (Val::Px(ref mut x), Val::Px(ref mut y)) = (&mut node.left, &mut node.top) {
-            *x += particle.velocity.x * time.delta_secs();
-            *y += particle.velocity.y * time.delta_secs();
-            
-            // 重力効果
-            particle.velocity.y += 200.0 * time.delta_secs();
+        let delta_x = particle.velocity.x * time.delta_secs();
+        let delta_y = particle.velocity.y * time.delta_secs();
+        
+        if let Val::Px(x) = node.left {
+            node.left = Val::Px(x + delta_x);
         }
+        if let Val::Px(y) = node.top {
+            node.top = Val::Px(y + delta_y);
+        }
+        
+        // 重力効果
+        particle.velocity.y += 200.0 * time.delta_secs();
         
         // フェードアウト
         let alpha = 1.0 - (particle.lifetime / particle.max_lifetime);
@@ -131,13 +136,8 @@ pub fn update_ui_glow_effects(
         let pulse = ((time_factor * 2.0 + glow.color_shift).sin() + 1.0) * 0.5;
         let glow_intensity = glow.intensity * pulse;
         
-        // グローエフェクトを背景色に追加
-        let base_color = bg_color.0;
-        bg_color.0 = Color::srgba(
-            (base_color.red() + glow_intensity * 0.3).min(1.0),
-            (base_color.green() + glow_intensity * 0.5).min(1.0),
-            (base_color.blue() + glow_intensity * 1.0).min(1.0),
-            base_color.alpha(),
-        );
+        // グローエフェクトを背景色に追加（簡略化）
+        let alpha = bg_color.0.alpha() + glow_intensity * 0.2;
+        bg_color.0.set_alpha(alpha.min(1.0));
     }
 }
