@@ -79,7 +79,7 @@ struct CookingStation {
     contents: Vec<String>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 enum StationType {
     Refrigerator,
     Counter,
