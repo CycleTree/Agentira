@@ -2,10 +2,10 @@ use bevy::prelude::*;
 
 mod cool_ui_system;
 mod ui_effects;
-mod cute_agents;
+mod voxel_girls;
 use cool_ui_system::*;
 use ui_effects::*;
-use cute_agents::*;
+use voxel_girls::*;
 
 // Fish Cake Kitchen - AI Cooking Simulation Game
 fn main() {
@@ -30,7 +30,7 @@ fn main() {
             update_particle_effects,
             update_floating_text,
             update_ui_glow_effects,
-            animate_cute_chefs,
+            animate_voxel_girls,
         ))
         .run();
 }
@@ -132,15 +132,15 @@ fn setup_kitchen(
     // キッチンレイアウト作成
     spawn_kitchen_layout(&mut commands, &mut meshes, &mut materials);
     
-    // AI料理人スポーン（可愛い3人のシェフ、異なるパーソナリティ）
+    // ボクセル女の子スポーン（可愛い3人、異なるパーソナリティ）
     let personalities = [
-        (ChefPersonality::Energetic, "Chef Akira", Vec3::new(-2.0, 0.5, -3.0)),
-        (ChefPersonality::Gentle, "Chef Sakura", Vec3::new(0.0, 0.5, -3.0)),
-        (ChefPersonality::Cool, "Chef Rei", Vec3::new(2.0, 0.5, -3.0)),
+        (GirlPersonality::Cheerful, "Miku-chan", Vec3::new(-2.0, 0.0, -3.0)),
+        (GirlPersonality::Sweet, "Sakura-chan", Vec3::new(0.0, 0.0, -3.0)),
+        (GirlPersonality::Cool, "Rei-chan", Vec3::new(2.0, 0.0, -3.0)),
     ];
     
     for (personality, name, position) in personalities {
-        spawn_cute_chef(
+        spawn_voxel_girl(
             &mut commands, 
             &mut meshes, 
             &mut materials, 
@@ -370,19 +370,19 @@ fn spawn_serving_area(
 
 // === システム ===
 
-// 簡略化されたChef behavior（CuteChef用）
+// 簡略化されたGirl behavior（VoxelGirl用）
 fn chef_behavior(
     time: Res<Time>,
-    mut chefs: Query<(&mut Transform, &mut CuteChef)>,
-    stations: Query<(Entity, &Transform, &CookingStation), (Without<CuteChef>,)>,
+    mut girls: Query<(&mut Transform, &mut VoxelGirl)>,
+    stations: Query<(Entity, &Transform, &CookingStation), (Without<VoxelGirl>,)>,
     kitchen_state: Res<KitchenState>,
 ) {
-    // 可愛いシェフたちのシンプルな行動
-    for (mut transform, mut chef) in &mut chefs {
-        chef.animation_timer += time.delta_secs();
+    // 可愛いボクセル女の子たちのシンプルな行動
+    for (mut transform, mut girl) in &mut girls {
+        girl.animation_timer += time.delta_secs();
         
         // 現在のタスクがない場合、新しいタスクを設定
-        if chef.current_task.is_none() {
+        if girl.current_task.is_none() {
             if let Some(recipe) = kitchen_state.current_recipes.get(0) {
                 if !recipe.completed && recipe.current_step < recipe.steps.len() {
                     let step_name = match &recipe.steps[recipe.current_step] {
@@ -391,13 +391,13 @@ fn chef_behavior(
                         CookingStep::Fry => "Frying".to_string(),
                         CookingStep::Bake => "Baking".to_string(),
                     };
-                    chef.current_task = Some(step_name);
+                    girl.current_task = Some(step_name);
                 }
             }
         }
         
         // タスクがある場合は対応するステーションに向かう
-        if let Some(task) = &chef.current_task {
+        if let Some(task) = &girl.current_task {
             let target_station = if task.contains("Getting") {
                 StationType::Refrigerator
             } else if task.contains("Chopping") {
@@ -415,17 +415,17 @@ fn chef_behavior(
                 .find(|(_, _, station)| station.station_type == target_station)
             {
                 let direction = (station_transform.translation - transform.translation).normalize_or_zero();
-                transform.translation += direction * chef.speed * 0.5 * time.delta_secs();
+                transform.translation += direction * girl.speed * 0.7 * time.delta_secs();
                 
                 if transform.translation.distance(station_transform.translation) < 2.0 {
-                    chef.current_task = None;
+                    girl.current_task = None;
                 }
             }
         } else {
             // タスクがない時は可愛い巡回動作
-            let patrol_movement = (chef.animation_timer * 0.3).sin() * 0.8 * time.delta_secs();
+            let patrol_movement = (girl.animation_timer * 0.3).sin() * 0.8 * time.delta_secs();
             transform.translation.x += patrol_movement;
-            transform.translation.z += (chef.animation_timer * 0.2).cos() * 0.5 * time.delta_secs();
+            transform.translation.z += (girl.animation_timer * 0.2).cos() * 0.5 * time.delta_secs();
         }
     }
 }
@@ -434,10 +434,10 @@ fn cooking_system(
     // 料理プロセスの管理
     mut kitchen_state: ResMut<KitchenState>,
     mut commands: Commands,
-    chefs: Query<&CuteChef>,
+    girls: Query<&VoxelGirl>,
 ) {
-    // すべてのシェフがタスクを完了したら次のステップに進む
-    let active_tasks: Vec<_> = chefs.iter().filter_map(|chef| chef.current_task.as_ref()).collect();
+    // すべてのボクセル女の子がタスクを完了したら次のステップに進む
+    let active_tasks: Vec<_> = girls.iter().filter_map(|girl| girl.current_task.as_ref()).collect();
     
     if active_tasks.is_empty() {
         let mut completed_recipes = 0;
