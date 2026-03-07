@@ -1,7 +1,9 @@
 use bevy::prelude::*;
 
-mod ui_system;
-use ui_system::*;
+mod cool_ui_system;
+mod ui_effects;
+use cool_ui_system::*;
+use ui_effects::*;
 
 fn main() {
     App::new()
@@ -14,13 +16,17 @@ fn main() {
             ..default()
         }))
         .insert_resource(KitchenState::default())
-        .add_systems(Startup, (setup_kitchen, setup_ui))
+        .add_systems(Startup, (setup_kitchen, setup_cool_ui))
         .add_systems(Update, (
             chef_behavior,
             cooking_system,
             task_system,
             camera_controls,
-            update_task_ui,
+            update_cool_ui,
+            animate_ui_elements,
+            update_particle_effects,
+            update_floating_text,
+            update_ui_glow_effects,
         ))
         .run();
 }
@@ -472,6 +478,7 @@ fn chef_behavior(
 fn cooking_system(
     // 料理プロセスの管理
     mut kitchen_state: ResMut<KitchenState>,
+    mut commands: Commands,
     chefs: Query<&Chef>,
 ) {
     // すべてのシェフがタスクを完了したら次のステップに進む
@@ -486,12 +493,37 @@ fn cooking_system(
                 if recipe.current_step >= recipe.steps.len() {
                     recipe.completed = true;
                     completed_recipes += 1;
+                    
+                    // 完成エフェクト発動！
+                    spawn_completion_effect(&mut commands, Vec2::new(400.0, 200.0));
+                    spawn_floating_text(
+                        &mut commands,
+                        "🍳 FISH CAKE COMPLETE! +10 XP".to_string(),
+                        Vec2::new(300.0, 150.0),
+                        Color::srgba(1.0, 0.8, 0.2, 1.0)
+                    );
                 }
             }
         }
         
         // 借用を分離して競合を回避
         kitchen_state.fish_cakes_made += completed_recipes;
+        
+        // 新しいレシピ開始
+        if completed_recipes > 0 {
+            kitchen_state.current_recipes.clear();
+            kitchen_state.current_recipes.push(Recipe {
+                name: "Fish Cakes".to_string(),
+                steps: vec![
+                    CookingStep::GetIngredient("White Belly".to_string()),
+                    CookingStep::Chop,
+                    CookingStep::Fry,
+                    CookingStep::Bake,
+                ],
+                current_step: 0,
+                completed: false,
+            });
+        }
     }
 }
 
