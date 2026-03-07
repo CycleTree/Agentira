@@ -225,61 +225,48 @@ fn spawn_building(
     position: Vec3,
     building_type: BuildingType,
 ) {
-    let (size, base_color, emissive, extra_elements) = match building_type {
+    let (blocks, base_color) = match building_type {
         BuildingType::Factory => (
-            Vec3::new(2.0, 1.5, 2.0),
-            Color::srgb(0.1, 0.15, 0.2),
-            LinearRgba::new(0.8, 0.4, 0.0, 1.0),  // オレンジ発光
-            true,  // 追加エレメント
+            vec![(0, 0, 0), (1, 0, 0), (0, 0, 1), (1, 0, 1),  // 基部 2x2
+                 (0, 1, 0), (1, 1, 0), (0, 1, 1), (1, 1, 1),  // 2層目
+                 (0, 2, 0), (1, 2, 1)],                        // 煙突
+            Color::srgb(0.6, 0.3, 0.2), // レンガ色
         ),
         BuildingType::Storage => (
-            Vec3::new(1.5, 1.0, 1.5),
-            Color::srgb(0.1, 0.2, 0.15),
-            LinearRgba::new(0.0, 0.6, 0.8, 1.0),  // シアン発光
-            false,  // 追加エレメントなし
+            vec![(0, 0, 0), (1, 0, 0), (0, 0, 1), (1, 0, 1),  // 基部 2x2
+                 (0, 1, 0), (1, 1, 1)],                        // 上部
+            Color::srgb(0.4, 0.4, 0.4), // 石色
         ),
     };
     
-    // メイン建物
-    let building_entity = commands.spawn((
-        Mesh3d(meshes.add(Cuboid::new(size.x, size.y, size.z))),
-        MeshMaterial3d(materials.add(StandardMaterial { 
-            base_color, 
-            emissive, 
-            metallic: 0.8,
-            perceptual_roughness: 0.3,
-            ..default() 
-        })),
-        Transform::from_translation(position + Vec3::Y * size.y / 2.0),
-        Building { building_type, progress: 100.0, producing: false },
-    )).id();
+    let material = materials.add(StandardMaterial { 
+        base_color,
+        perceptual_roughness: 0.8,
+        ..default() 
+    });
     
-    if extra_elements && building_type == BuildingType::Factory {
-        // 工場用追加エレメント
-        // 発光パネル
+    // ボクセルブロックを配置
+    for (dx, dy, dz) in blocks {
         commands.spawn((
-            Mesh3d(meshes.add(Cuboid::new(0.8, 0.1, 0.8))),
+            Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
+            MeshMaterial3d(material.clone()),
+            Transform::from_translation(position + Vec3::new(dx as f32, dy as f32 + 1.0, dz as f32)),
+            Building { building_type, progress: 100.0, producing: false },
+        ));
+    }
+    
+    // 工場の場合は煙突に煙エフェクト
+    if building_type == BuildingType::Factory {
+        commands.spawn((
+            Mesh3d(meshes.add(Cuboid::new(0.3, 0.3, 0.3))),
             MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: Color::srgba(1.0, 0.5, 0.0, 0.9),
-                emissive: LinearRgba::new(1.0, 0.6, 0.0, 1.0),
+                base_color: Color::srgba(0.8, 0.8, 0.8, 0.6),
                 alpha_mode: bevy::prelude::AlphaMode::Blend,
                 unlit: true,
                 ..default()
             })),
-            Transform::from_translation(position + Vec3::new(0.0, size.y + 0.1, 0.0)),
-            Bobbing { offset: 0.0, speed: 1.0 },
-        ));
-        
-        // アンテナ
-        commands.spawn((
-            Mesh3d(meshes.add(Cuboid::new(0.1, 1.0, 0.1))),
-            MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: Color::srgb(0.8, 0.8, 0.9),
-                emissive: LinearRgba::new(0.4, 0.4, 0.6, 1.0),
-                metallic: 0.9,
-                ..default()
-            })),
-            Transform::from_translation(position + Vec3::new(0.0, size.y + 0.8, 0.0)),
+            Transform::from_translation(position + Vec3::new(0.5, 4.0, 0.5)),
+            Bobbing { offset: 0.0, speed: 2.0 },
         ));
     }
 }
@@ -298,52 +285,11 @@ fn setup(
         MainCamera,
     ));
 
-    // サイバー風床 - ダークブルー/パープル
-    commands.spawn((
-        Mesh3d(meshes.add(Plane3d::default().mesh().size(32.0, 32.0))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::srgb(0.05, 0.08, 0.15),
-            emissive: LinearRgba::new(0.02, 0.05, 0.12, 1.0),
-            metallic: 0.8,
-            perceptual_roughness: 0.2,
-            ..default()
-        })),
-    ));
+    // Minecraft風ボクセル地形生成
+    spawn_minecraft_terrain(&mut commands, &mut meshes, &mut materials);
     
-    // ネオングリッド - サイバー風
-    for i in -16..=16 {
-        let is_major = i % 4 == 0;
-        let (color, emissive, alpha) = if is_major {
-            (Color::srgb(0.0, 0.8, 1.0), LinearRgba::new(0.0, 0.6, 0.8, 1.0), 0.8)  // シアン主要線
-        } else {
-            (Color::srgb(0.2, 0.0, 0.8), LinearRgba::new(0.1, 0.0, 0.4, 1.0), 0.4)  // 紫補助線
-        };
-        let pos = i as f32;
-        
-        // X軸線
-        commands.spawn((
-            Mesh3d(meshes.add(Cuboid::new(32.0, 0.02, if is_major { 0.04 } else { 0.02 }))), 
-            MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: color,
-                emissive,
-                unlit: true,
-                ..default()
-            })), 
-            Transform::from_xyz(0.0, 0.01, pos)
-        ));
-        
-        // Z軸線
-        commands.spawn((
-            Mesh3d(meshes.add(Cuboid::new(if is_major { 0.04 } else { 0.02 }, 0.02, 32.0))), 
-            MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: color,
-                emissive,
-                unlit: true,
-                ..default()
-            })), 
-            Transform::from_xyz(pos, 0.01, 0.0)
-        ));
-    }
+    // 自然オブジェクト生成
+    spawn_minecraft_objects(&mut commands, &mut meshes, &mut materials);
 
     // エージェント
     // Collectors (緑)
@@ -375,44 +321,22 @@ fn setup(
     spawn_building(&mut commands, &mut meshes, &mut materials, Vec3::new(0.0, 0.0, -6.0), BuildingType::Factory);
     spawn_building(&mut commands, &mut meshes, &mut materials, Vec3::new(5.0, 0.0, 0.0), BuildingType::Storage);
 
-    // サイバー風多色ライティング
-    // メイン青色指向性ライト
+    // Minecraft風太陽光照明
+    // 太陽光 - 温かい黄色系
     commands.spawn((
         DirectionalLight { 
-            illuminance: 8000.0, 
-            color: Color::srgb(0.3, 0.6, 1.0),
+            illuminance: 12000.0, 
+            color: Color::srgb(1.0, 0.95, 0.8),
             shadows_enabled: true, 
             ..default() 
         }, 
-        Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -0.7, 0.5, 0.0))
+        Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -0.6, 0.3, 0.0))
     ));
     
-    // サイドライト - パープル
-    commands.spawn((
-        PointLight {
-            intensity: 2000.0,
-            color: Color::srgb(0.8, 0.2, 1.0),
-            range: 30.0,
-            ..default()
-        },
-        Transform::from_xyz(-10.0, 15.0, 0.0)
-    ));
-    
-    // サイドライト - シアン
-    commands.spawn((
-        PointLight {
-            intensity: 2000.0,
-            color: Color::srgb(0.0, 0.8, 1.0),
-            range: 30.0,
-            ..default()
-        },
-        Transform::from_xyz(10.0, 15.0, 0.0)
-    ));
-    
-    // ダークアンビエント
+    // 明るいアンビエント - 空の色
     commands.insert_resource(AmbientLight { 
-        color: Color::srgb(0.1, 0.15, 0.3), 
-        brightness: 200.0 
+        color: Color::srgb(0.6, 0.8, 1.0), 
+        brightness: 800.0 
     });
 }
 
@@ -494,9 +418,17 @@ fn agent_behavior(
             }
         }
         
-        // 境界制限
-        transform.translation.x = transform.translation.x.clamp(-14.0, 14.0);
-        transform.translation.z = transform.translation.z.clamp(-14.0, 14.0);
+        // 境界制限 (Minecraft地形内)
+        transform.translation.x = transform.translation.x.clamp(-15.0, 15.0);
+        transform.translation.z = transform.translation.z.clamp(-15.0, 15.0);
+        
+        // Y座標を地形に合わせて調整
+        let grid_x = transform.translation.x.round() as i32;
+        let grid_z = transform.translation.z.round() as i32;
+        let height = ((grid_x as f32 * 0.1).sin() * (grid_z as f32 * 0.15).cos() * 2.0 + 
+                     (grid_x as f32 * 0.05).cos() * (grid_z as f32 * 0.08).sin() * 1.0).round() as i32;
+        let ground_y = 0.max(height.min(3)) + 1;
+        transform.translation.y = ground_y as f32 + 0.5; // 地面より少し上
     }
 }
 
@@ -513,6 +445,161 @@ fn building_production(
                 building.progress = 0.0;
                 state.iron_collected = state.iron_collected.saturating_sub(1);
                 state.products_made += 1;
+            }
+        }
+    }
+}
+
+// Minecraft風地形生成関数
+fn spawn_minecraft_terrain(
+    commands: &mut Commands,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    materials: &mut ResMut<Assets<StandardMaterial>>,
+) {
+    // 草ブロック用マテリアル
+    let grass_top_material = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.4, 0.8, 0.3),
+        perceptual_roughness: 0.8,
+        ..default()
+    });
+    
+    let dirt_material = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.5, 0.3, 0.2),
+        perceptual_roughness: 0.9,
+        ..default()
+    });
+    
+    // ボクセル地形生成 (32x32エリア)
+    for x in -16..=16 {
+        for z in -16..=16 {
+            // 高さマップ生成 (シンプルなノイズ)
+            let height = ((x as f32 * 0.1).sin() * (z as f32 * 0.15).cos() * 2.0 + 
+                         (x as f32 * 0.05).cos() * (z as f32 * 0.08).sin() * 1.0).round() as i32;
+            let base_height = 0.max(height.min(3));
+            
+            // 地下ブロック (土)
+            for y in 0..base_height {
+                commands.spawn((
+                    Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
+                    MeshMaterial3d(dirt_material.clone()),
+                    Transform::from_xyz(x as f32, y as f32, z as f32),
+                ));
+            }
+            
+            // 表面ブロック (草)
+            if base_height >= 0 {
+                commands.spawn((
+                    Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
+                    MeshMaterial3d(grass_top_material.clone()),
+                    Transform::from_xyz(x as f32, base_height as f32, z as f32),
+                ));
+            }
+        }
+    }
+}
+
+fn spawn_minecraft_objects(
+    commands: &mut Commands,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    materials: &mut ResMut<Assets<StandardMaterial>>,
+) {
+    // 木の幹マテリアル
+    let wood_material = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.4, 0.2, 0.1),
+        perceptual_roughness: 0.9,
+        ..default()
+    });
+    
+    // 葉っぱマテリアル
+    let leaves_material = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.2, 0.6, 0.2),
+        perceptual_roughness: 0.8,
+        ..default()
+    });
+    
+    // 石マテリアル
+    let stone_material = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.5, 0.5, 0.5),
+        perceptual_roughness: 0.7,
+        ..default()
+    });
+    
+    // 水マテリアル
+    let water_material = materials.add(StandardMaterial {
+        base_color: Color::srgba(0.2, 0.4, 0.8, 0.7),
+        alpha_mode: bevy::prelude::AlphaMode::Blend,
+        perceptual_roughness: 0.1,
+        ..default()
+    });
+    
+    // 木を生成 (数本)
+    for i in 0..8 {
+        let angle = i as f32 * 0.785; // 45度ずつ
+        let x = (angle.cos() * 8.0) as i32;
+        let z = (angle.sin() * 8.0) as i32;
+        
+        // 地面の高さを計算
+        let ground_height = ((x as f32 * 0.1).sin() * (z as f32 * 0.15).cos() * 2.0 + 
+                           (x as f32 * 0.05).cos() * (z as f32 * 0.08).sin() * 1.0).round() as i32;
+        let base_y = 0.max(ground_height.min(3)) + 1;
+        
+        // 木の幹 (3-5ブロック高)
+        let tree_height = 3 + (i % 3);
+        for y in 0..tree_height {
+            commands.spawn((
+                Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
+                MeshMaterial3d(wood_material.clone()),
+                Transform::from_xyz(x as f32, (base_y + y) as f32, z as f32),
+            ));
+        }
+        
+        // 葉っぱ (3x3x2の立方体)
+        let leaves_y = base_y + tree_height;
+        for dx in -1..=1 {
+            for dz in -1..=1 {
+                for dy in 0..=1 {
+                    if !(dx == 0 && dz == 0 && dy == 0) { // 幹の位置は除く
+                        commands.spawn((
+                            Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
+                            MeshMaterial3d(leaves_material.clone()),
+                            Transform::from_xyz((x + dx) as f32, (leaves_y + dy) as f32, (z + dz) as f32),
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    
+    // 石の塊を生成 (数か所)
+    for i in 0..5 {
+        let angle = i as f32 * 1.256; // 72度ずつ
+        let x = (angle.cos() * 12.0) as i32;
+        let z = (angle.sin() * 12.0) as i32;
+        
+        let ground_height = ((x as f32 * 0.1).sin() * (z as f32 * 0.15).cos() * 2.0).round() as i32;
+        let base_y = 0.max(ground_height.min(3)) + 1;
+        
+        // 2x2の石ブロック
+        for dx in 0..2 {
+            for dz in 0..2 {
+                commands.spawn((
+                    Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
+                    MeshMaterial3d(stone_material.clone()),
+                    Transform::from_xyz((x + dx) as f32, base_y as f32, (z + dz) as f32),
+                ));
+            }
+        }
+    }
+    
+    // 水の池を生成 (中央付近)
+    for x in -2..=2 {
+        for z in -2..=2 {
+            if x * x + z * z <= 4 { // 円形の池
+                commands.spawn((
+                    Mesh3d(meshes.add(Cuboid::new(1.0, 0.5, 1.0))),
+                    MeshMaterial3d(water_material.clone()),
+                    Transform::from_xyz(x as f32, 0.75, z as f32), // 地面より少し高い
+                ));
             }
         }
     }
@@ -579,20 +666,15 @@ fn update_trails(
                 let alpha = *lifetime * 0.5;
                 let scale = 0.1 + alpha * 0.15;
                 
-                let (base_color, emissive_color) = match agent.role {
-                    AgentRole::Collector => (
-                        Color::srgba(0.0, 1.0, 0.5, alpha),
-                        LinearRgba::new(0.0, 1.0, 0.5, 0.8),
-                    ),
-                    AgentRole::Builder => (
-                        Color::srgba(1.0, 0.6, 0.0, alpha),
-                        LinearRgba::new(1.0, 0.6, 0.0, 0.8),
-                    ),
-                    AgentRole::Worker => (
-                        Color::srgba(0.2, 0.4, 1.0, alpha),
-                        LinearRgba::new(0.2, 0.4, 1.0, 0.8),
-                    ),
+                let color = match agent.role {
+                    AgentRole::Collector => Color::srgb(0.0, 1.0, 0.5),
+                    AgentRole::Builder => Color::srgb(1.0, 0.6, 0.0),
+                    AgentRole::Worker => Color::srgb(0.2, 0.4, 1.0),
                 };
+                
+                let linear: LinearRgba = color.into();
+                let base_color = Color::srgba(linear.red, linear.green, linear.blue, alpha);
+                let emissive_color = LinearRgba::new(linear.red, linear.green, linear.blue, 0.8);
                 
                 commands.spawn((
                     Mesh3d(meshes.add(Sphere::new(scale))),
