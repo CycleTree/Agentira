@@ -17,6 +17,9 @@ fn main() {
             building_production,
             spawn_resources,
             animate_resources,
+            update_trails,
+            update_trail_particles,
+            update_effect_emitters,
             rotate_camera,
         ))
         .run();
@@ -78,6 +81,35 @@ struct Bobbing { offset: f32, speed: f32 }
 #[derive(Component)]
 struct MainCamera;
 
+#[derive(Component)]
+struct Trail {
+    positions: Vec<(Vec3, f32)>, // (位置, 寿命)
+    max_length: usize,
+    spawn_timer: f32,
+}
+
+impl Default for Trail {
+    fn default() -> Self {
+        Self {
+            positions: Vec::new(),
+            max_length: 15,
+            spawn_timer: 0.0,
+        }
+    }
+}
+
+#[derive(Component)]
+struct TrailParticle {
+    lifetime: f32,
+    max_lifetime: f32,
+}
+
+#[derive(Component)]
+struct EffectEmitter {
+    timer: f32,
+    interval: f32,
+}
+
 // === スポーン関数 ===
 
 fn spawn_agent(
@@ -116,6 +148,7 @@ fn spawn_agent(
             carrying: None,
             target: None,
         },
+        Trail::default(),
     )).with_children(|p| {
         // 体
         p.spawn((Mesh3d(meshes.add(Cuboid::new(0.5, 0.7, 0.35))), MeshMaterial3d(body_mat.clone()), Transform::from_xyz(0.0, 0.55, 0.0)));
@@ -155,17 +188,33 @@ fn spawn_resource_node(
     materials: &mut ResMut<Assets<StandardMaterial>>,
     position: Vec3,
 ) {
-    commands.spawn((
+    // メインリソース球体 - 強力な発光
+    let main_entity = commands.spawn((
         Mesh3d(meshes.add(Sphere::new(0.3))),
         MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::srgb(0.6, 0.6, 0.7),
-            emissive: LinearRgba::new(0.3, 0.3, 0.4, 1.0),
-            metallic: 0.9,
+            base_color: Color::srgb(0.8, 0.9, 1.0),
+            emissive: LinearRgba::new(0.6, 0.8, 1.2, 1.0),
+            metallic: 0.95,
+            perceptual_roughness: 0.05,
             ..default()
         })),
         Transform::from_translation(position + Vec3::Y * 0.4),
         ResourceNode { resource_type: ResourceType::Iron },
         Bobbing { offset: position.x + position.z, speed: 2.0 },
+        EffectEmitter { timer: 0.0, interval: 0.1 },
+    )).id();
+
+    // 外側グロー効果
+    commands.spawn((
+        Mesh3d(meshes.add(Sphere::new(0.5))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::srgba(0.0, 0.5, 1.0, 0.3),
+            emissive: LinearRgba::new(0.0, 0.4, 0.8, 0.5),
+            alpha_mode: bevy::prelude::AlphaMode::Blend,
+            ..default()
+        })),
+        Transform::from_translation(position + Vec3::Y * 0.4),
+        Bobbing { offset: position.x + position.z + 1.0, speed: 1.5 },
     ));
 }
 
@@ -176,25 +225,63 @@ fn spawn_building(
     position: Vec3,
     building_type: BuildingType,
 ) {
-    let (size, color, emissive) = match building_type {
+    let (size, base_color, emissive, extra_elements) = match building_type {
         BuildingType::Factory => (
             Vec3::new(2.0, 1.5, 2.0),
-            Color::srgb(0.5, 0.4, 0.3),
-            LinearRgba::new(0.2, 0.15, 0.1, 1.0),
+            Color::srgb(0.1, 0.15, 0.2),
+            LinearRgba::new(0.8, 0.4, 0.0, 1.0),  // オレンジ発光
+            true,  // 追加エレメント
         ),
         BuildingType::Storage => (
             Vec3::new(1.5, 1.0, 1.5),
-            Color::srgb(0.3, 0.4, 0.5),
-            LinearRgba::new(0.1, 0.15, 0.2, 1.0),
+            Color::srgb(0.1, 0.2, 0.15),
+            LinearRgba::new(0.0, 0.6, 0.8, 1.0),  // シアン発光
+            false,  // 追加エレメントなし
         ),
     };
     
-    commands.spawn((
+    // メイン建物
+    let building_entity = commands.spawn((
         Mesh3d(meshes.add(Cuboid::new(size.x, size.y, size.z))),
-        MeshMaterial3d(materials.add(StandardMaterial { base_color: color, emissive, ..default() })),
+        MeshMaterial3d(materials.add(StandardMaterial { 
+            base_color, 
+            emissive, 
+            metallic: 0.8,
+            perceptual_roughness: 0.3,
+            ..default() 
+        })),
         Transform::from_translation(position + Vec3::Y * size.y / 2.0),
         Building { building_type, progress: 100.0, producing: false },
-    ));
+    )).id();
+    
+    if extra_elements && building_type == BuildingType::Factory {
+        // 工場用追加エレメント
+        // 発光パネル
+        commands.spawn((
+            Mesh3d(meshes.add(Cuboid::new(0.8, 0.1, 0.8))),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: Color::srgba(1.0, 0.5, 0.0, 0.9),
+                emissive: LinearRgba::new(1.0, 0.6, 0.0, 1.0),
+                alpha_mode: bevy::prelude::AlphaMode::Blend,
+                unlit: true,
+                ..default()
+            })),
+            Transform::from_translation(position + Vec3::new(0.0, size.y + 0.1, 0.0)),
+            Bobbing { offset: 0.0, speed: 1.0 },
+        ));
+        
+        // アンテナ
+        commands.spawn((
+            Mesh3d(meshes.add(Cuboid::new(0.1, 1.0, 0.1))),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: Color::srgb(0.8, 0.8, 0.9),
+                emissive: LinearRgba::new(0.4, 0.4, 0.6, 1.0),
+                metallic: 0.9,
+                ..default()
+            })),
+            Transform::from_translation(position + Vec3::new(0.0, size.y + 0.8, 0.0)),
+        ));
+    }
 }
 
 // === セットアップ ===
@@ -211,18 +298,51 @@ fn setup(
         MainCamera,
     ));
 
-    // 床
+    // サイバー風床 - ダークブルー/パープル
     commands.spawn((
         Mesh3d(meshes.add(Plane3d::default().mesh().size(32.0, 32.0))),
-        MeshMaterial3d(materials.add(Color::srgb(0.12, 0.15, 0.1))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::srgb(0.05, 0.08, 0.15),
+            emissive: LinearRgba::new(0.02, 0.05, 0.12, 1.0),
+            metallic: 0.8,
+            perceptual_roughness: 0.2,
+            ..default()
+        })),
     ));
     
-    // グリッド
+    // ネオングリッド - サイバー風
     for i in -16..=16 {
-        let alpha = if i % 4 == 0 { 0.3 } else { 0.1 };
+        let is_major = i % 4 == 0;
+        let (color, emissive, alpha) = if is_major {
+            (Color::srgb(0.0, 0.8, 1.0), LinearRgba::new(0.0, 0.6, 0.8, 1.0), 0.8)  // シアン主要線
+        } else {
+            (Color::srgb(0.2, 0.0, 0.8), LinearRgba::new(0.1, 0.0, 0.4, 1.0), 0.4)  // 紫補助線
+        };
         let pos = i as f32;
-        commands.spawn((Mesh3d(meshes.add(Cuboid::new(32.0, 0.01, 0.02))), MeshMaterial3d(materials.add(Color::srgba(0.4, 0.5, 0.3, alpha))), Transform::from_xyz(0.0, 0.01, pos)));
-        commands.spawn((Mesh3d(meshes.add(Cuboid::new(0.02, 0.01, 32.0))), MeshMaterial3d(materials.add(Color::srgba(0.4, 0.5, 0.3, alpha))), Transform::from_xyz(pos, 0.01, 0.0)));
+        
+        // X軸線
+        commands.spawn((
+            Mesh3d(meshes.add(Cuboid::new(32.0, 0.02, if is_major { 0.04 } else { 0.02 }))), 
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: Color::srgba(color.red(), color.green(), color.blue(), alpha),
+                emissive,
+                unlit: true,
+                ..default()
+            })), 
+            Transform::from_xyz(0.0, 0.01, pos)
+        ));
+        
+        // Z軸線
+        commands.spawn((
+            Mesh3d(meshes.add(Cuboid::new(if is_major { 0.04 } else { 0.02 }, 0.02, 32.0))), 
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: Color::srgba(color.red(), color.green(), color.blue(), alpha),
+                emissive,
+                unlit: true,
+                ..default()
+            })), 
+            Transform::from_xyz(pos, 0.01, 0.0)
+        ));
     }
 
     // エージェント
@@ -255,9 +375,45 @@ fn setup(
     spawn_building(&mut commands, &mut meshes, &mut materials, Vec3::new(0.0, 0.0, -6.0), BuildingType::Factory);
     spawn_building(&mut commands, &mut meshes, &mut materials, Vec3::new(5.0, 0.0, 0.0), BuildingType::Storage);
 
-    // 光源
-    commands.spawn((DirectionalLight { illuminance: 10000.0, shadows_enabled: true, ..default() }, Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -0.7, 0.5, 0.0))));
-    commands.insert_resource(AmbientLight { color: Color::srgb(0.5, 0.55, 0.6), brightness: 350.0 });
+    // サイバー風多色ライティング
+    // メイン青色指向性ライト
+    commands.spawn((
+        DirectionalLight { 
+            illuminance: 8000.0, 
+            color: Color::srgb(0.3, 0.6, 1.0),
+            shadows_enabled: true, 
+            ..default() 
+        }, 
+        Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -0.7, 0.5, 0.0))
+    ));
+    
+    // サイドライト - パープル
+    commands.spawn((
+        PointLight {
+            intensity: 2000.0,
+            color: Color::srgb(0.8, 0.2, 1.0),
+            range: 30.0,
+            ..default()
+        },
+        Transform::from_xyz(-10.0, 15.0, 0.0)
+    ));
+    
+    // サイドライト - シアン
+    commands.spawn((
+        PointLight {
+            intensity: 2000.0,
+            color: Color::srgb(0.0, 0.8, 1.0),
+            range: 30.0,
+            ..default()
+        },
+        Transform::from_xyz(10.0, 15.0, 0.0)
+    ));
+    
+    // ダークアンビエント
+    commands.insert_resource(AmbientLight { 
+        color: Color::srgb(0.1, 0.15, 0.3), 
+        brightness: 200.0 
+    });
 }
 
 // === 行動システム ===
@@ -390,15 +546,145 @@ fn animate_resources(
     }
 }
 
+fn update_trails(
+    time: Res<Time>,
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut agents: Query<(&Transform, &mut Trail, &Agent)>,
+) {
+    for (transform, mut trail, agent) in &mut agents {
+        trail.spawn_timer += time.delta_secs();
+        
+        // 軌跡ポイント追加
+        if trail.spawn_timer >= 0.05 {
+            trail.spawn_timer = 0.0;
+            trail.positions.push((transform.translation, 1.0));
+            
+            // 最大長制限
+            if trail.positions.len() > trail.max_length {
+                trail.positions.remove(0);
+            }
+        }
+        
+        // 寿命更新
+        for (_, lifetime) in &mut trail.positions {
+            *lifetime -= time.delta_secs() * 2.0;
+        }
+        trail.positions.retain(|(_, lifetime)| *lifetime > 0.0);
+        
+        // トレイルパーティクル生成
+        for (i, (pos, lifetime)) in trail.positions.iter().enumerate() {
+            if i % 3 == 0 {  // 間引き
+                let alpha = *lifetime * 0.5;
+                let scale = 0.1 + alpha * 0.15;
+                
+                let color = match agent.role {
+                    AgentRole::Collector => Color::srgba(0.0, 1.0, 0.5, alpha),
+                    AgentRole::Builder => Color::srgba(1.0, 0.6, 0.0, alpha),
+                    AgentRole::Worker => Color::srgba(0.2, 0.4, 1.0, alpha),
+                };
+                
+                commands.spawn((
+                    Mesh3d(meshes.add(Sphere::new(scale))),
+                    MeshMaterial3d(materials.add(StandardMaterial {
+                        base_color: color,
+                        emissive: LinearRgba::new(color.red(), color.green(), color.blue(), 0.8),
+                        alpha_mode: bevy::prelude::AlphaMode::Blend,
+                        unlit: true,
+                        ..default()
+                    })),
+                    Transform::from_translation(*pos + Vec3::Y * 0.3),
+                    TrailParticle { lifetime: *lifetime, max_lifetime: 1.0 },
+                ));
+            }
+        }
+    }
+}
+
+fn update_trail_particles(
+    time: Res<Time>,
+    mut commands: Commands,
+    mut particles: Query<(Entity, &mut TrailParticle, &mut Transform)>,
+) {
+    for (entity, mut particle, mut transform) in &mut particles {
+        particle.lifetime -= time.delta_secs() * 2.0;
+        
+        // フェードアウト
+        transform.scale *= 0.95;
+        
+        if particle.lifetime <= 0.0 {
+            commands.entity(entity).despawn();
+        }
+    }
+}
+
+fn update_effect_emitters(
+    time: Res<Time>,
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut emitters: Query<(&Transform, &mut EffectEmitter), With<ResourceNode>>,
+) {
+    for (transform, mut emitter) in &mut emitters {
+        emitter.timer += time.delta_secs();
+        
+        if emitter.timer >= emitter.interval {
+            emitter.timer = 0.0;
+            
+            // スパークエフェクト
+            let angle = time.elapsed_secs() * 3.0;
+            let radius = 0.8;
+            let spark_pos = transform.translation + Vec3::new(
+                angle.cos() * radius,
+                (angle * 2.0).sin() * 0.2,
+                angle.sin() * radius,
+            );
+            
+            commands.spawn((
+                Mesh3d(meshes.add(Sphere::new(0.05))),
+                MeshMaterial3d(materials.add(StandardMaterial {
+                    base_color: Color::srgba(1.0, 1.0, 0.8, 0.8),
+                    emissive: LinearRgba::new(0.8, 0.8, 1.0, 1.0),
+                    alpha_mode: bevy::prelude::AlphaMode::Blend,
+                    unlit: true,
+                    ..default()
+                })),
+                Transform::from_translation(spark_pos),
+                TrailParticle { lifetime: 0.5, max_lifetime: 0.5 },
+            ));
+        }
+    }
+}
+
 fn rotate_camera(
     time: Res<Time>,
     mut query: Query<&mut Transform, With<MainCamera>>,
 ) {
     for mut transform in &mut query {
-        let angle = time.elapsed_secs() * 0.05;
-        let radius = 28.0;
-        let height = 20.0;
-        transform.translation = Vec3::new(angle.sin() * radius, height, angle.cos() * radius);
-        transform.look_at(Vec3::ZERO, Vec3::Y);
+        let t = time.elapsed_secs();
+        
+        // 複雑な軌道パターン
+        let angle = t * 0.08;
+        let height_wave = (t * 0.3).sin() * 5.0;
+        let radius_wave = (t * 0.15).cos() * 5.0;
+        
+        let radius = 25.0 + radius_wave;
+        let height = 18.0 + height_wave;
+        
+        // 螺旋的カメラ動作
+        let x = angle.sin() * radius + (t * 0.2).cos() * 3.0;
+        let y = height + (t * 0.25).sin() * 2.0;
+        let z = angle.cos() * radius + (t * 0.1).sin() * 3.0;
+        
+        transform.translation = Vec3::new(x, y, z);
+        
+        // 注視点も少し動的に
+        let look_target = Vec3::new(
+            (t * 0.1).sin() * 2.0,
+            (t * 0.2).cos() * 1.0,
+            0.0
+        );
+        transform.look_at(look_target, Vec3::Y);
     }
 }
