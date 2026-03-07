@@ -183,7 +183,7 @@ fn spawn_chef(
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     position: Vec3,
-    name: String,
+    _name: String,
 ) {
     let chef_body_material = materials.add(StandardMaterial {
         base_color: Color::srgb(0.9, 0.9, 0.9), // 白いコック服
@@ -408,7 +408,7 @@ fn chef_behavior(
             match task {
                 CookingStep::GetIngredient(ingredient) => {
                     // 冷蔵庫に向かう
-                    if let Some((station_entity, station_transform, _)) = stations
+                    if let Some((_, station_transform, _)) = stations
                         .iter()
                         .find(|(_, _, station)| matches!(station.station_type, StationType::Refrigerator))
                     {
@@ -478,15 +478,20 @@ fn cooking_system(
     let active_tasks: Vec<_> = chefs.iter().filter_map(|chef| chef.current_task.as_ref()).collect();
     
     if active_tasks.is_empty() {
+        let mut completed_recipes = 0;
+        
         for recipe in &mut kitchen_state.current_recipes {
             if !recipe.completed {
                 recipe.current_step += 1;
                 if recipe.current_step >= recipe.steps.len() {
                     recipe.completed = true;
-                    kitchen_state.fish_cakes_made += 1;
+                    completed_recipes += 1;
                 }
             }
         }
+        
+        // 借用を分離して競合を回避
+        kitchen_state.fish_cakes_made += completed_recipes;
     }
 }
 
