@@ -13,9 +13,7 @@ fn main() {
         .insert_resource(FactoryState::default())
         .add_systems(Startup, setup)
         .add_systems(Update, (
-            collector_behavior,
-            builder_behavior,
-            worker_behavior,
+            agent_behavior,
             building_production,
             spawn_resources,
             animate_resources,
@@ -264,101 +262,85 @@ fn setup(
 
 // === 行動システム ===
 
-fn collector_behavior(
+fn agent_behavior(
     time: Res<Time>,
     mut state: ResMut<FactoryState>,
     resources: Query<(Entity, &Transform), With<ResourceNode>>,
     buildings: Query<&Transform, With<Building>>,
-    mut agents: Query<(&mut Transform, &mut Agent), Without<ResourceNode>>,
+    mut agents: Query<(&mut Transform, &mut Agent), (Without<ResourceNode>, Without<Building>)>,
     mut commands: Commands,
 ) {
     let resource_positions: Vec<(Entity, Vec3)> = resources.iter().map(|(e, t)| (e, t.translation)).collect();
-    let storage_pos = buildings.iter().next().map(|t| t.translation);
+    let storage_pos = buildings.iter().find(|t| t.translation.distance(Vec3::new(5.0, 0.5, 0.0)) < 0.1).map(|t| t.translation);
+    let factory_pos = buildings.iter().find(|t| t.translation.distance(Vec3::new(0.0, 0.75, -6.0)) < 0.1).map(|t| t.translation);
     
     for (mut transform, mut agent) in &mut agents {
-        if agent.role != AgentRole::Collector { continue; }
-        
-        if agent.carrying.is_some() {
-            // 運搬中 → ストレージへ
-            if let Some(storage) = storage_pos {
-                let dir = (storage - transform.translation).normalize_or_zero();
-                let dir_xz = Vec3::new(dir.x, 0.0, dir.z).normalize_or_zero();
-                transform.translation += dir_xz * agent.speed * time.delta_secs();
-                if dir_xz.length() > 0.01 { let target = transform.translation + dir_xz; transform.look_at(target, Vec3::Y); }
-                
-                if transform.translation.distance(storage) < 2.0 {
-                    agent.carrying = None;
-                    state.iron_collected += 1;
+        match agent.role {
+            AgentRole::Collector => {
+                if agent.carrying.is_some() {
+                    // 運搬中 → ストレージへ
+                    if let Some(storage) = storage_pos {
+                        let dir = (storage - transform.translation).normalize_or_zero();
+                        let dir_xz = Vec3::new(dir.x, 0.0, dir.z).normalize_or_zero();
+                        transform.translation += dir_xz * agent.speed * time.delta_secs();
+                        if dir_xz.length() > 0.01 { let target = transform.translation + dir_xz; transform.look_at(target, Vec3::Y); }
+                        
+                        if transform.translation.distance(storage) < 2.0 {
+                            agent.carrying = None;
+                            state.iron_collected += 1;
+                        }
+                    }
+                } else {
+                    // 収集 → 最寄りリソースへ
+                    if let Some((entity, res_pos)) = resource_positions.iter().min_by(|a, b| {
+                        transform.translation.distance(a.1).partial_cmp(&transform.translation.distance(b.1)).unwrap()
+                    }) {
+                        let dir = (*res_pos - transform.translation).normalize_or_zero();
+                        let dir_xz = Vec3::new(dir.x, 0.0, dir.z).normalize_or_zero();
+                        transform.translation += dir_xz * agent.speed * time.delta_secs();
+                        if dir_xz.length() > 0.01 { let target = transform.translation + dir_xz; transform.look_at(target, Vec3::Y); }
+                        
+                        if transform.translation.distance(*res_pos) < 0.8 {
+                            agent.carrying = Some(ResourceType::Iron);
+                            commands.entity(*entity).despawn();
+                        }
+                    }
                 }
-            }
-        } else {
-            // 収集 → 最寄りリソースへ
-            if let Some((entity, res_pos)) = resource_positions.iter().min_by(|a, b| {
-                transform.translation.distance(a.1).partial_cmp(&transform.translation.distance(b.1)).unwrap()
-            }) {
-                let dir = (*res_pos - transform.translation).normalize_or_zero();
-                let dir_xz = Vec3::new(dir.x, 0.0, dir.z).normalize_or_zero();
-                transform.translation += dir_xz * agent.speed * time.delta_secs();
-                if dir_xz.length() > 0.01 { let target = transform.translation + dir_xz; transform.look_at(target, Vec3::Y); }
-                
-                if transform.translation.distance(*res_pos) < 0.8 {
-                    agent.carrying = Some(ResourceType::Iron);
-                    commands.entity(*entity).despawn();
-                }
-            }
-        }
-        
-        transform.translation.x = transform.translation.x.clamp(-14.0, 14.0);
-        transform.translation.z = transform.translation.z.clamp(-14.0, 14.0);
-    }
-}
-
-fn builder_behavior(
-    time: Res<Time>,
-    mut agents: Query<(&mut Transform, &Agent)>,
-) {
-    for (mut transform, agent) in &mut agents {
-        if agent.role != AgentRole::Builder { continue; }
-        
-        // ランダム巡回
-        let t = time.elapsed_secs();
-        let target = Vec3::new((t * 0.5).sin() * 8.0, 0.0, (t * 0.3).cos() * 8.0);
-        let dir = (target - transform.translation).normalize_or_zero();
-        let dir_xz = Vec3::new(dir.x, 0.0, dir.z).normalize_or_zero();
-        transform.translation += dir_xz * agent.speed * time.delta_secs() * 0.5;
-        if dir_xz.length() > 0.01 { let target = transform.translation + dir_xz; transform.look_at(target, Vec3::Y); }
-        
-        transform.translation.x = transform.translation.x.clamp(-14.0, 14.0);
-        transform.translation.z = transform.translation.z.clamp(-14.0, 14.0);
-    }
-}
-
-fn worker_behavior(
-    time: Res<Time>,
-    buildings: Query<&Transform, With<Building>>,
-    mut agents: Query<(&mut Transform, &Agent), Without<Building>>,
-) {
-    let factory_pos = buildings.iter().next().map(|t| t.translation);
-    
-    for (mut transform, agent) in &mut agents {
-        if agent.role != AgentRole::Worker { continue; }
-        
-        if let Some(factory) = factory_pos {
-            let dist = transform.translation.distance(factory);
-            if dist > 3.0 {
-                let dir = (factory - transform.translation).normalize_or_zero();
-                let dir_xz = Vec3::new(dir.x, 0.0, dir.z).normalize_or_zero();
-                transform.translation += dir_xz * agent.speed * time.delta_secs();
-                if dir_xz.length() > 0.01 { let target = transform.translation + dir_xz; transform.look_at(target, Vec3::Y); }
-            } else {
-                // 工場周辺で作業
+            },
+            
+            AgentRole::Builder => {
+                // ランダム巡回
                 let t = time.elapsed_secs();
-                let orbit = Vec3::new((t * 1.5).sin() * 2.5, 0.0, (t * 1.5).cos() * 2.5);
-                let target = factory + orbit;
+                let target = Vec3::new((t * 0.5).sin() * 8.0, 0.0, (t * 0.3).cos() * 8.0);
                 let dir = (target - transform.translation).normalize_or_zero();
-                transform.translation += dir * agent.speed * time.delta_secs() * 0.3;
+                let dir_xz = Vec3::new(dir.x, 0.0, dir.z).normalize_or_zero();
+                transform.translation += dir_xz * agent.speed * time.delta_secs() * 0.5;
+                if dir_xz.length() > 0.01 { let target = transform.translation + dir_xz; transform.look_at(target, Vec3::Y); }
+            },
+            
+            AgentRole::Worker => {
+                if let Some(factory) = factory_pos {
+                    let dist = transform.translation.distance(factory);
+                    if dist > 3.0 {
+                        let dir = (factory - transform.translation).normalize_or_zero();
+                        let dir_xz = Vec3::new(dir.x, 0.0, dir.z).normalize_or_zero();
+                        transform.translation += dir_xz * agent.speed * time.delta_secs();
+                        if dir_xz.length() > 0.01 { let target = transform.translation + dir_xz; transform.look_at(target, Vec3::Y); }
+                    } else {
+                        // 工場周辺で作業
+                        let t = time.elapsed_secs();
+                        let orbit = Vec3::new((t * 1.5).sin() * 2.5, 0.0, (t * 1.5).cos() * 2.5);
+                        let target = factory + orbit;
+                        let dir = (target - transform.translation).normalize_or_zero();
+                        transform.translation += dir * agent.speed * time.delta_secs() * 0.3;
+                    }
+                }
             }
         }
+        
+        // 境界制限
+        transform.translation.x = transform.translation.x.clamp(-14.0, 14.0);
+        transform.translation.z = transform.translation.z.clamp(-14.0, 14.0);
     }
 }
 
