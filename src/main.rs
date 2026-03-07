@@ -284,7 +284,7 @@ fn collector_behavior(
                 let dir = (storage - transform.translation).normalize_or_zero();
                 let dir_xz = Vec3::new(dir.x, 0.0, dir.z).normalize_or_zero();
                 transform.translation += dir_xz * agent.speed * time.delta_secs();
-                if dir_xz.length() > 0.01 { transform.look_at(transform.translation + dir_xz, Vec3::Y); }
+                if dir_xz.length() > 0.01 { let target = transform.translation + dir_xz; transform.look_at(target, Vec3::Y); }
                 
                 if transform.translation.distance(storage) < 2.0 {
                     agent.carrying = None;
@@ -299,7 +299,7 @@ fn collector_behavior(
                 let dir = (*res_pos - transform.translation).normalize_or_zero();
                 let dir_xz = Vec3::new(dir.x, 0.0, dir.z).normalize_or_zero();
                 transform.translation += dir_xz * agent.speed * time.delta_secs();
-                if dir_xz.length() > 0.01 { transform.look_at(transform.translation + dir_xz, Vec3::Y); }
+                if dir_xz.length() > 0.01 { let target = transform.translation + dir_xz; transform.look_at(target, Vec3::Y); }
                 
                 if transform.translation.distance(*res_pos) < 0.8 {
                     agent.carrying = Some(ResourceType::Iron);
@@ -326,7 +326,7 @@ fn builder_behavior(
         let dir = (target - transform.translation).normalize_or_zero();
         let dir_xz = Vec3::new(dir.x, 0.0, dir.z).normalize_or_zero();
         transform.translation += dir_xz * agent.speed * time.delta_secs() * 0.5;
-        if dir_xz.length() > 0.01 { transform.look_at(transform.translation + dir_xz, Vec3::Y); }
+        if dir_xz.length() > 0.01 { let target = transform.translation + dir_xz; transform.look_at(target, Vec3::Y); }
         
         transform.translation.x = transform.translation.x.clamp(-14.0, 14.0);
         transform.translation.z = transform.translation.z.clamp(-14.0, 14.0);
@@ -349,7 +349,7 @@ fn worker_behavior(
                 let dir = (factory - transform.translation).normalize_or_zero();
                 let dir_xz = Vec3::new(dir.x, 0.0, dir.z).normalize_or_zero();
                 transform.translation += dir_xz * agent.speed * time.delta_secs();
-                if dir_xz.length() > 0.01 { transform.look_at(transform.translation + dir_xz, Vec3::Y); }
+                if dir_xz.length() > 0.01 { let target = transform.translation + dir_xz; transform.look_at(target, Vec3::Y); }
             } else {
                 // 工場周辺で作業
                 let t = time.elapsed_secs();
