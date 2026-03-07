@@ -45,6 +45,15 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
+      
+      - name: Notify Discord on build failure
+        if: failure()
+        run: |
+          curl -X POST "${{ secrets.DISCORD_WEBHOOK }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "content": "🚨 **<@1078639209167990814> CI Build Failed!** 🚨\n❌ **Repository:** `${{ github.repository }}`\n🔧 **Workflow:** `${{ github.workflow }}`\n📋 **Job:** `Build WASM`\n🌟 **Branch:** `${{ github.ref_name }}`\n🔗 **Details:** <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}>"
+            }'
 
   deploy:
     environment:
@@ -56,3 +65,21 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+      
+      - name: Notify Discord on deploy failure
+        if: failure()
+        run: |
+          curl -X POST "${{ secrets.DISCORD_WEBHOOK }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "content": "🚨 **<@1078639209167990814> Deployment Failed!** 🚨\n❌ **Repository:** `${{ github.repository }}`\n🔧 **Workflow:** `${{ github.workflow }}`\n📋 **Job:** `Deploy to GitHub Pages`\n🌟 **Branch:** `${{ github.ref_name }}`\n🔗 **Details:** <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}>"
+            }'
+      
+      - name: Notify Discord on success
+        if: success()
+        run: |
+          curl -X POST "${{ secrets.DISCORD_WEBHOOK }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "content": "✅ **<@1078639209167990814> Deployment Successful!** 🎉\n🚀 **Repository:** `${{ github.repository }}`\n🔧 **Workflow:** `${{ github.workflow }}`\n🌟 **Branch:** `${{ github.ref_name }}`\n🎮 **Live Demo:** https://cycletree.github.io/Agentira/"
+            }'
