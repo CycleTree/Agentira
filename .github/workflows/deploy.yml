@@ -52,7 +52,7 @@ jobs:
           curl -X POST "${{ secrets.DISCORD_WEBHOOK }}" \
             -H "Content-Type: application/json" \
             -d '{
-              "content": "🚨 **<@1078639209167990814> CI Build Failed!** 🚨\n❌ **Repository:** `${{ github.repository }}`\n🔧 **Workflow:** `${{ github.workflow }}`\n📋 **Job:** `Build WASM`\n🌟 **Branch:** `${{ github.ref_name }}`\n🔗 **Details:** <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}>"
+              "content": "🚨 **<@1477290094112145458> CI Build Failed!** 🚨\n❌ **Repository:** `${{ github.repository }}`\n🔧 **Workflow:** `${{ github.workflow }}`\n📋 **Job:** `Build WASM`\n🌟 **Branch:** `${{ github.ref_name }}`\n🔗 **Details:** <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}>"
             }'
 
   deploy:
@@ -72,7 +72,7 @@ jobs:
           curl -X POST "${{ secrets.DISCORD_WEBHOOK }}" \
             -H "Content-Type: application/json" \
             -d '{
-              "content": "🚨 **<@1078639209167990814> Deployment Failed!** 🚨\n❌ **Repository:** `${{ github.repository }}`\n🔧 **Workflow:** `${{ github.workflow }}`\n📋 **Job:** `Deploy to GitHub Pages`\n🌟 **Branch:** `${{ github.ref_name }}`\n🔗 **Details:** <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}>"
+              "content": "🚨 **<@1477290094112145458> Deployment Failed!** 🚨\n❌ **Repository:** `${{ github.repository }}`\n🔧 **Workflow:** `${{ github.workflow }}`\n📋 **Job:** `Deploy to GitHub Pages`\n🌟 **Branch:** `${{ github.ref_name }}`\n🔗 **Details:** <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}>"
             }'
       
       - name: Notify Discord on success
@@ -81,5 +81,5 @@ jobs:
           curl -X POST "${{ secrets.DISCORD_WEBHOOK }}" \
             -H "Content-Type: application/json" \
             -d '{
-              "content": "✅ **<@1078639209167990814> Deployment Successful!** 🎉\n🚀 **Repository:** `${{ github.repository }}`\n🔧 **Workflow:** `${{ github.workflow }}`\n🌟 **Branch:** `${{ github.ref_name }}`\n🎮 **Live Demo:** https://cycletree.github.io/Agentira/"
+              "content": "✅ **<@1477290094112145458> Deployment Successful!** 🎉\n🚀 **Repository:** `${{ github.repository }}`\n🔧 **Workflow:** `${{ github.workflow }}`\n🌟 **Branch:** `${{ github.ref_name }}`\n🎮 **Live Demo:** https://cycletree.github.io/Agentira/"
             }'
