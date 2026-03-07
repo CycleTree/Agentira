@@ -324,7 +324,7 @@ fn setup(
         commands.spawn((
             Mesh3d(meshes.add(Cuboid::new(32.0, 0.02, if is_major { 0.04 } else { 0.02 }))), 
             MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: { let c: LinearRgba = color.into(); Color::srgba(c.red, c.green, c.blue, alpha) },
+                base_color: color,
                 emissive,
                 unlit: true,
                 ..default()
@@ -336,7 +336,7 @@ fn setup(
         commands.spawn((
             Mesh3d(meshes.add(Cuboid::new(if is_major { 0.04 } else { 0.02 }, 0.02, 32.0))), 
             MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: { let c: LinearRgba = color.into(); Color::srgba(c.red, c.green, c.blue, alpha) },
+                base_color: color,
                 emissive,
                 unlit: true,
                 ..default()
@@ -579,17 +579,26 @@ fn update_trails(
                 let alpha = *lifetime * 0.5;
                 let scale = 0.1 + alpha * 0.15;
                 
-                let color = match agent.role {
-                    AgentRole::Collector => Color::srgba(0.0, 1.0, 0.5, alpha),
-                    AgentRole::Builder => Color::srgba(1.0, 0.6, 0.0, alpha),
-                    AgentRole::Worker => Color::srgba(0.2, 0.4, 1.0, alpha),
+                let (base_color, emissive_color) = match agent.role {
+                    AgentRole::Collector => (
+                        Color::srgba(0.0, 1.0, 0.5, alpha),
+                        LinearRgba::new(0.0, 1.0, 0.5, 0.8),
+                    ),
+                    AgentRole::Builder => (
+                        Color::srgba(1.0, 0.6, 0.0, alpha),
+                        LinearRgba::new(1.0, 0.6, 0.0, 0.8),
+                    ),
+                    AgentRole::Worker => (
+                        Color::srgba(0.2, 0.4, 1.0, alpha),
+                        LinearRgba::new(0.2, 0.4, 1.0, 0.8),
+                    ),
                 };
                 
                 commands.spawn((
                     Mesh3d(meshes.add(Sphere::new(scale))),
                     MeshMaterial3d(materials.add(StandardMaterial {
-                        base_color: color,
-                        emissive: { let c: LinearRgba = color.into(); LinearRgba::new(c.red, c.green, c.blue, 0.8) },
+                        base_color,
+                        emissive: emissive_color,
                         alpha_mode: bevy::prelude::AlphaMode::Blend,
                         unlit: true,
                         ..default()
