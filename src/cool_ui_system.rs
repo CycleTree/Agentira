@@ -225,7 +225,7 @@ fn spawn_fancy_task_item(
     });
 }
 
-fn spawn_chef_status_panel(parent: &mut ChildBuilder, time: &Res<Time>) {
+fn spawn_chef_status_panel(parent: &mut ChildBuilder, _time: &Res<Time>) {
     parent.spawn((
         Node {
             width: Val::Percent(100.0),
@@ -369,8 +369,8 @@ fn spawn_side_panel(commands: &mut Commands, time: &Res<Time>) {
 pub fn update_cool_ui(
     kitchen_state: Res<crate::KitchenState>,
     mut completion_counter: Query<&mut Text, (With<CompletionCounter>, Without<TaskProgressBar>)>,
-    mut task_colors: Query<&mut TextColor, Without<CompletionCounter>>,
-    time: Res<Time>,
+    _task_colors: Query<&mut TextColor, Without<CompletionCounter>>,
+    _time: Res<Time>,
 ) {
     // 完成数カウンター更新
     if let Ok(mut counter_text) = completion_counter.get_single_mut() {
@@ -378,7 +378,7 @@ pub fn update_cool_ui(
     }
     
     // タスクの色更新（現在のステップに基づいて）
-    if let Some(recipe) = kitchen_state.current_recipes.get(0) {
+    if let Some(_recipe) = kitchen_state.current_recipes.get(0) {
         // タスクのアクティブ状態を更新する処理
         // （実装簡略化のため、基本的な色変更のみ）
     }
@@ -401,13 +401,8 @@ pub fn animate_ui_elements(
             },
             AnimationType::Glow => {
                 let glow = ((elapsed * 2.0).sin() + 1.0) * 0.5;
-                let intensity = 0.1 + glow * 0.15;
-                bg_color.0 = Color::srgba(
-                    bg_color.0.red() + intensity,
-                    bg_color.0.green() + intensity,
-                    bg_color.0.blue() + intensity,
-                    bg_color.0.alpha()
-                );
+                let alpha = 0.3 + glow * 0.2;
+                bg_color.0.set_alpha(alpha);
             },
             AnimationType::Slide => {
                 let slide = (elapsed * 4.0).sin() * 2.0;
