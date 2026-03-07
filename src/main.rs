@@ -78,13 +78,17 @@ fn spawn_woodcutter(
 ) {
     let body_mat = materials.add(StandardMaterial { 
         base_color: Color::srgb(0.6, 0.4, 0.2),  // 茶色の服
-        perceptual_roughness: 0.8,
+        metallic: 0.0,
+        perceptual_roughness: 1.0,
+        reflectance: 0.0,
         ..default() 
     });
     
     let skin_mat = materials.add(StandardMaterial {
         base_color: Color::srgb(0.9, 0.7, 0.6),  // 肌色
-        perceptual_roughness: 0.9,
+        metallic: 0.0,
+        perceptual_roughness: 1.0,
+        reflectance: 0.0,
         ..default()
     });
     
@@ -101,23 +105,13 @@ fn spawn_woodcutter(
             target_chest: None,
         },
     )).with_children(|p| {
-        // 体
-        p.spawn((Mesh3d(meshes.add(Cuboid::new(0.5, 0.7, 0.3))), MeshMaterial3d(body_mat.clone()), Transform::from_xyz(0.0, 0.5, 0.0)));
+        // 軽量化: パーツを大幅削減（マインクラフト風シンプル）
+        // 体（統合）
+        p.spawn((Mesh3d(meshes.add(Cuboid::new(0.6, 1.2, 0.4))), MeshMaterial3d(body_mat.clone()), Transform::from_xyz(0.0, 0.6, 0.0)));
         // 頭
-        p.spawn((Mesh3d(meshes.add(Cuboid::new(0.4, 0.4, 0.4))), MeshMaterial3d(skin_mat.clone()), Transform::from_xyz(0.0, 1.0, 0.0)));
-        // 目
-        p.spawn((Mesh3d(meshes.add(Cuboid::new(0.08, 0.04, 0.02))), MeshMaterial3d(materials.add(Color::BLACK)), Transform::from_xyz(-0.06, 1.05, 0.15)));
-        p.spawn((Mesh3d(meshes.add(Cuboid::new(0.08, 0.04, 0.02))), MeshMaterial3d(materials.add(Color::BLACK)), Transform::from_xyz(0.06, 1.05, 0.15)));
-        // 腕
-        p.spawn((Mesh3d(meshes.add(Cuboid::new(0.15, 0.4, 0.15))), MeshMaterial3d(skin_mat.clone()), Transform::from_xyz(-0.35, 0.4, 0.0)));
-        p.spawn((Mesh3d(meshes.add(Cuboid::new(0.15, 0.4, 0.15))), MeshMaterial3d(skin_mat.clone()), Transform::from_xyz(0.35, 0.4, 0.0)));
-        // 脚
-        p.spawn((Mesh3d(meshes.add(Cuboid::new(0.18, 0.4, 0.18))), MeshMaterial3d(body_mat.clone()), Transform::from_xyz(-0.12, 0.0, 0.0)));
-        p.spawn((Mesh3d(meshes.add(Cuboid::new(0.18, 0.4, 0.18))), MeshMaterial3d(body_mat.clone()), Transform::from_xyz(0.12, 0.0, 0.0)));
-        
-        // 斧 (木こり道具)
-        p.spawn((Mesh3d(meshes.add(Cuboid::new(0.06, 0.6, 0.06))), MeshMaterial3d(materials.add(Color::srgb(0.4, 0.2, 0.1))), Transform::from_xyz(0.5, 0.5, 0.0))); // 柄
-        p.spawn((Mesh3d(meshes.add(Cuboid::new(0.2, 0.15, 0.08))), MeshMaterial3d(materials.add(Color::srgb(0.7, 0.7, 0.7))), Transform::from_xyz(0.6, 0.8, 0.0))); // 刃
+        p.spawn((Mesh3d(meshes.add(Cuboid::new(0.5, 0.5, 0.5))), MeshMaterial3d(skin_mat.clone()), Transform::from_xyz(0.0, 1.3, 0.0)));
+        // 斧（統合）
+        p.spawn((Mesh3d(meshes.add(Cuboid::new(0.08, 0.8, 0.08))), MeshMaterial3d(materials.add(Color::srgb(0.4, 0.2, 0.1))), Transform::from_xyz(0.5, 0.8, 0.0)));
     });
 }
 
@@ -129,17 +123,21 @@ fn spawn_chest(
 ) {
     let chest_material = materials.add(StandardMaterial {
         base_color: Color::srgb(0.4, 0.2, 0.1),  // 茶色の木材
-        perceptual_roughness: 0.8,
+        metallic: 0.0,
+        perceptual_roughness: 1.0,
+        reflectance: 0.0,
         ..default()
     });
     
     let metal_material = materials.add(StandardMaterial {
         base_color: Color::srgb(0.6, 0.6, 0.6),  // 金属の金具
-        metallic: 0.8,
-        perceptual_roughness: 0.3,
+        metallic: 0.0,  // 軽量化: 金属反射なし
+        perceptual_roughness: 1.0,
+        reflectance: 0.0,
         ..default()
     });
     
+    // 軽量化: チェストをシンプルな単一立方体に
     commands.spawn((
         Mesh3d(meshes.add(Cuboid::new(1.2, 0.8, 0.8))),
         MeshMaterial3d(chest_material.clone()),
@@ -148,11 +146,7 @@ fn spawn_chest(
             wood_count: 0,
             max_capacity: 20,
         },
-    )).with_children(|p| {
-        // 金具装飾
-        p.spawn((Mesh3d(meshes.add(Cuboid::new(1.3, 0.1, 0.1))), MeshMaterial3d(metal_material.clone()), Transform::from_xyz(0.0, 0.2, 0.0)));
-        p.spawn((Mesh3d(meshes.add(Cuboid::new(1.3, 0.1, 0.1))), MeshMaterial3d(metal_material.clone()), Transform::from_xyz(0.0, -0.2, 0.0)));
-    });
+    ));
 }
 
 // === セットアップ ===
@@ -208,16 +202,20 @@ fn spawn_minecraft_terrain(
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
 ) {
-    // 草ブロック用マテリアル
+    // 草ブロック用マテリアル（軽量化）
     let grass_top_material = materials.add(StandardMaterial {
         base_color: Color::srgb(0.4, 0.8, 0.3),
-        perceptual_roughness: 0.8,
+        metallic: 0.0,
+        perceptual_roughness: 1.0,
+        reflectance: 0.0,
         ..default()
     });
     
     let dirt_material = materials.add(StandardMaterial {
         base_color: Color::srgb(0.5, 0.3, 0.2),
-        perceptual_roughness: 0.9,
+        metallic: 0.0,
+        perceptual_roughness: 1.0,
+        reflectance: 0.0,
         ..default()
     });
     
@@ -295,9 +293,9 @@ fn spawn_tree(
             being_cut: false,
         },
     )).with_children(|p| {
-        // 葉っぱ (球状)
+        // 葉っぱ (マインクラフト風立方体)
         p.spawn((
-            Mesh3d(meshes.add(Sphere::new(2.0))),
+            Mesh3d(meshes.add(Cuboid::new(3.0, 3.0, 3.0))),
             MeshMaterial3d(leaves_material.clone()),
             Transform::from_xyz(0.0, 2.0, 0.0),
         ));
@@ -391,10 +389,13 @@ fn animate_trees(
     time: Res<Time>,
     mut trees: Query<&mut Transform, With<Tree>>,
 ) {
-    for mut transform in &mut trees {
-        // 木の軽い揺れアニメーション
-        let sway = (time.elapsed_secs() + transform.translation.x + transform.translation.z).sin() * 0.02;
-        transform.rotation = Quat::from_rotation_z(sway);
+    // 軽量化: アニメーション頻度を下げる（0.5秒間隔）
+    if (time.elapsed_secs() * 2.0) % 1.0 < 0.1 {
+        for mut transform in &mut trees {
+            // より軽い計算
+            let sway = (time.elapsed_secs() * 0.5).sin() * 0.01;
+            transform.rotation = Quat::from_rotation_z(sway);
+        }
     }
 }
 
@@ -402,16 +403,19 @@ fn rotate_camera(
     time: Res<Time>,
     mut query: Query<&mut Transform, With<MainCamera>>,
 ) {
-    for mut transform in &mut query {
-        let t = time.elapsed_secs();
-        
-        // シンプルな軌道
-        let angle = t * 0.05;
-        let radius = 20.0;
-        let height = 15.0;
-        
-        transform.translation = Vec3::new(angle.sin() * radius, height, angle.cos() * radius);
-        transform.look_at(Vec3::ZERO, Vec3::Y);
+    // 軽量化: カメラ更新頻度を下げる
+    if (time.elapsed_secs() * 10.0) % 1.0 < 0.1 {
+        for mut transform in &mut query {
+            let t = time.elapsed_secs();
+            
+            // より軽い計算
+            let angle = t * 0.03; // 回転速度を下げる
+            let radius = 20.0;
+            let height = 15.0;
+            
+            transform.translation = Vec3::new(angle.sin() * radius, height, angle.cos() * radius);
+            transform.look_at(Vec3::ZERO, Vec3::Y);
+        }
     }
 }
 
@@ -425,11 +429,17 @@ fn tree_respawn_system(
     // 既存のマテリアルを再作成（簡略化）
     let trunk_material = materials.add(StandardMaterial {
         base_color: Color::srgb(0.4, 0.2, 0.1),
+        metallic: 0.0,      // 軽量化: 金属反射なし
+        perceptual_roughness: 1.0,  // 軽量化: 完全マット
+        reflectance: 0.0,   // 軽量化: 反射なし
         ..default()
     });
     
     let leaves_material = materials.add(StandardMaterial {
         base_color: Color::srgb(0.2, 0.6, 0.2),
+        metallic: 0.0,
+        perceptual_roughness: 1.0,
+        reflectance: 0.0,
         ..default()
     });
     
