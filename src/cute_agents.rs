@@ -170,7 +170,7 @@ fn spawn_cute_body(
     }
     
     // 胸元のボタン（可愛いディテール）
-    for (i, y) in [0.9, 0.7, 0.5].iter().enumerate() {
+    for (_i, y) in [0.9, 0.7, 0.5].iter().enumerate() {
         parent.spawn((
             Mesh3d(meshes.add(Sphere::new(0.04))),
             MeshMaterial3d(materials.add(StandardMaterial {
@@ -228,7 +228,7 @@ fn spawn_cute_head(
             ..default()
         })),
         Transform::from_xyz(0.0, 1.15, 0.3)
-            .with_rotation(Quat::from_rotation_z(PI / 8)),
+            .with_rotation(Quat::from_rotation_z(PI / 8.0)),
     ));
     
     // コック帽（立派で可愛い）
@@ -372,7 +372,7 @@ fn spawn_cute_arms(
     });
     
     // 左右の腕
-    for (side, x) in [("left", -0.45), ("right", 0.45)] {
+    for (_side, x) in [("left", -0.45), ("right", 0.45)] {
         // 上腕
         parent.spawn((
             Mesh3d(meshes.add(Capsule3d::new(0.08, 0.3))),
@@ -450,7 +450,7 @@ fn spawn_cute_legs(
             Mesh3d(meshes.add(Capsule3d::new(0.08, 0.15))),
             MeshMaterial3d(shoe_material.clone()),
             Transform::from_xyz(x, -0.25, 0.08)
-                .with_rotation(Quat::from_rotation_x(PI / 2)),
+                .with_rotation(Quat::from_rotation_x(PI / 2.0)),
         ));
     }
 }
@@ -528,7 +528,7 @@ fn spawn_chef_accessories(
                     Mesh3d(meshes.add(Cylinder::new(0.06, 0.005))),
                     MeshMaterial3d(glass_material.clone()),
                     Transform::from_xyz(x, 1.35, 0.32)
-                        .with_rotation(Quat::from_rotation_x(PI / 2)),
+                        .with_rotation(Quat::from_rotation_x(PI / 2.0)),
                 ));
                 
                 // フレーム
@@ -536,7 +536,7 @@ fn spawn_chef_accessories(
                     Mesh3d(meshes.add(Torus::new(0.06, 0.008))),
                     MeshMaterial3d(frame_material.clone()),
                     Transform::from_xyz(x, 1.35, 0.32)
-                        .with_rotation(Quat::from_rotation_x(PI / 2)),
+                        .with_rotation(Quat::from_rotation_x(PI / 2.0)),
                 ));
             }
             
@@ -545,7 +545,7 @@ fn spawn_chef_accessories(
                 Mesh3d(meshes.add(Cylinder::new(0.005, 0.04))),
                 MeshMaterial3d(frame_material),
                 Transform::from_xyz(0.0, 1.35, 0.32)
-                    .with_rotation(Quat::from_rotation_z(PI / 2)),
+                    .with_rotation(Quat::from_rotation_z(PI / 2.0)),
             ));
         }
     }
