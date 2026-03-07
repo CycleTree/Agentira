@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use std::f32::consts::PI;
 
 fn main() {
     App::new()
@@ -18,7 +17,6 @@ fn main() {
             collect_resources,
             spawn_resources,
             animate_resources,
-            update_score_display,
             rotate_camera,
         ))
         .run();
@@ -43,9 +41,6 @@ struct Resource {
 }
 
 #[derive(Component)]
-struct ScoreText;
-
-#[derive(Component)]
 struct MainCamera;
 
 #[derive(Component)]
@@ -59,19 +54,28 @@ fn spawn_voxel_agent(
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     position: Vec3,
-    color: Color,
+    base_color: Color,
     speed: f32,
     id: usize,
 ) {
+    // LinearRgbaに変換してemissive用の明るい色を作る
+    let linear: LinearRgba = base_color.into();
+    let emissive_linear = LinearRgba::new(
+        linear.red * 0.3,
+        linear.green * 0.3,
+        linear.blue * 0.3,
+        1.0,
+    );
+    
     let body_material = materials.add(StandardMaterial {
-        base_color: color,
-        emissive: color.into(),
+        base_color,
+        emissive: emissive_linear,
         ..default()
     });
     let dark_material = materials.add(Color::srgb(0.05, 0.05, 0.05));
     let eye_material = materials.add(StandardMaterial {
         base_color: Color::WHITE,
-        emissive: (Color::WHITE * 2.0).into(),
+        emissive: LinearRgba::new(1.0, 1.0, 1.0, 1.0),
         ..default()
     });
     
@@ -108,21 +112,19 @@ fn spawn_voxel_agent(
             Transform::from_xyz(0.0, 1.65, 0.0),
         ));
         
-        // アンテナ先端（光る）
+        // アンテナ先端
         parent.spawn((
             Mesh3d(meshes.add(Sphere::new(0.08))),
             MeshMaterial3d(eye_material.clone()),
             Transform::from_xyz(0.0, 1.85, 0.0),
         ));
         
-        // 目（左）
+        // 目
         parent.spawn((
             Mesh3d(meshes.add(Cuboid::new(0.12, 0.08, 0.05))),
             MeshMaterial3d(eye_material.clone()),
             Transform::from_xyz(-0.12, 1.28, 0.23),
         ));
-        
-        // 目（右）
         parent.spawn((
             Mesh3d(meshes.add(Cuboid::new(0.12, 0.08, 0.05))),
             MeshMaterial3d(eye_material.clone()),
@@ -162,17 +164,18 @@ fn spawn_resource(
     position: Vec3,
 ) {
     let colors = [
-        Color::srgb(1.0, 0.8, 0.2),  // 金
-        Color::srgb(0.2, 1.0, 0.8),  // シアン
-        Color::srgb(1.0, 0.4, 0.8),  // ピンク
+        (Color::srgb(1.0, 0.8, 0.2), LinearRgba::new(2.0, 1.5, 0.3, 1.0)),
+        (Color::srgb(0.2, 1.0, 0.8), LinearRgba::new(0.3, 2.0, 1.5, 1.0)),
+        (Color::srgb(1.0, 0.4, 0.8), LinearRgba::new(2.0, 0.6, 1.5, 1.0)),
     ];
-    let color = colors[(position.x.abs() as usize + position.z.abs() as usize) % colors.len()];
+    let idx = (position.x.abs() as usize + position.z.abs() as usize) % colors.len();
+    let (base_color, emissive) = colors[idx];
     
     commands.spawn((
         Mesh3d(meshes.add(Sphere::new(0.25))),
         MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: color,
-            emissive: (color * 3.0).into(),
+            base_color,
+            emissive,
             ..default()
         })),
         Transform::from_translation(position + Vec3::Y * 0.5),
@@ -267,7 +270,6 @@ fn chase_behavior(
     let resource_positions: Vec<Vec3> = resources.iter().map(|t| t.translation).collect();
     
     for (mut transform, mut agent) in &mut agents {
-        // 最も近いリソースを探す
         let mut closest: Option<Vec3> = None;
         let mut closest_dist = f32::MAX;
         
@@ -281,7 +283,6 @@ fn chase_behavior(
         
         agent.target = closest;
         
-        // ターゲットに向かって移動
         if let Some(target) = agent.target {
             let direction = (target - transform.translation).normalize_or_zero();
             let direction_xz = Vec3::new(direction.x, 0.0, direction.z).normalize_or_zero();
@@ -294,7 +295,6 @@ fn chase_behavior(
             }
         }
         
-        // 境界制限
         transform.translation.x = transform.translation.x.clamp(-12.0, 12.0);
         transform.translation.z = transform.translation.z.clamp(-12.0, 12.0);
     }
@@ -343,13 +343,6 @@ fn animate_resources(
         transform.translation.y = 0.5 + ((time.elapsed_secs() * bobbing.speed + bobbing.offset).sin() * 0.2);
         transform.rotate_y(time.delta_secs() * 2.0);
     }
-}
-
-fn update_score_display(
-    game_state: Res<GameState>,
-) {
-    // スコア表示（デバッグ用、後でUIに変更）
-    // println!("Scores: {:?}", game_state.scores);
 }
 
 fn rotate_camera(
