@@ -16,6 +16,7 @@ fn main() {
             woodcutter_behavior,
             animate_trees,
             rotate_camera,
+            tree_respawn_system,
         ))
         .run();
 }
@@ -59,6 +60,13 @@ struct Bobbing {
 
 #[derive(Component)]
 struct MainCamera;
+
+#[derive(Component)]
+struct TreeRespawnTimer {
+    position: Vec3,
+    respawn_time: f32,
+    elapsed: f32,
+}
 
 // === スポーン関数 ===
 
@@ -343,7 +351,14 @@ fn woodcutter_behavior(
                     tree.health -= 30.0 * time.delta_secs(); // 1秒で30ダメージ
                     
                     if tree.health <= 0.0 {
-                        // 木が切れた
+                        // 木が切れた - リスポーンタイマーを作成
+                        let tree_position = tree_transform.translation;
+                        commands.spawn(TreeRespawnTimer {
+                            position: tree_position,
+                            respawn_time: 15.0, // 15秒後にリスポーン
+                            elapsed: 0.0,
+                        });
+                        
                         commands.entity(tree_entity).despawn_recursive();
                         woodcutter.carrying_wood = true;
                         state.trees_cut += 1;
@@ -397,5 +412,43 @@ fn rotate_camera(
         
         transform.translation = Vec3::new(angle.sin() * radius, height, angle.cos() * radius);
         transform.look_at(Vec3::ZERO, Vec3::Y);
+    }
+}
+
+fn tree_respawn_system(
+    time: Res<Time>,
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut respawn_timers: Query<(Entity, &mut TreeRespawnTimer)>,
+) {
+    // 既存のマテリアルを再作成（簡略化）
+    let trunk_material = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.4, 0.2, 0.1),
+        ..default()
+    });
+    
+    let leaves_material = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.2, 0.6, 0.2),
+        ..default()
+    });
+    
+    for (entity, mut timer) in &mut respawn_timers {
+        timer.elapsed += time.delta_secs();
+        
+        if timer.elapsed >= timer.respawn_time {
+            // 新しい木を生成
+            spawn_tree(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                timer.position,
+                &trunk_material,
+                &leaves_material,
+            );
+            
+            // タイマーエンティティを削除
+            commands.entity(entity).despawn();
+        }
     }
 }
