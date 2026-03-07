@@ -303,13 +303,14 @@ fn woodcutter_behavior(
     mut state: ResMut<WoodcuttingState>,
     mut woodcutters: Query<(&mut Transform, &mut Woodcutter)>,
     mut trees: Query<(Entity, &Transform, &mut Tree), (With<Tree>, Without<Woodcutter>)>,
-    mut chests: Query<(Entity, &Transform, &mut Chest), (With<Chest>, Without<Woodcutter>, Without<Tree>)>,
+    chests: Query<(Entity, &Transform), (With<Chest>, Without<Woodcutter>, Without<Tree>)>,
+    mut chest_storage: Query<&mut Chest>,
     mut commands: Commands,
 ) {
     for (mut transform, mut woodcutter) in &mut woodcutters {
         if woodcutter.carrying_wood {
             // 木材を運搬中 → 最寄りのチェストへ
-            if let Some((chest_entity, chest_transform, _)) = chests.iter().min_by(|a, b| {
+            if let Some((chest_entity, chest_transform)) = chests.iter().min_by(|a, b| {
                 transform.translation.distance(a.1.translation).partial_cmp(&transform.translation.distance(b.1.translation)).unwrap()
             }) {
                 let dir = (chest_transform.translation - transform.translation).normalize_or_zero();
@@ -319,7 +320,7 @@ fn woodcutter_behavior(
                     state.wood_collected += 1;
                     
                     // チェストの中身を更新
-                    if let Ok((_, _, mut chest)) = chests.get_mut(chest_entity) {
+                    if let Ok(mut chest) = chest_storage.get_mut(chest_entity) {
                         if chest.wood_count < chest.max_capacity {
                             chest.wood_count += 1;
                         }
@@ -358,7 +359,7 @@ fn woodcutter_behavior(
         
         // 移動方向を向く
         if woodcutter.carrying_wood {
-            if let Some((_, chest_transform, _)) = chests.iter().min_by(|a, b| {
+            if let Some((_, chest_transform)) = chests.iter().min_by(|a, b| {
                 transform.translation.distance(a.1.translation).partial_cmp(&transform.translation.distance(b.1.translation)).unwrap()
             }) {
                 let look_dir = (chest_transform.translation - transform.translation).normalize_or_zero();
