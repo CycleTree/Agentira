@@ -39,7 +39,7 @@ COMMIT_AUTHOR=$(git log --format='%an' -n 1 $GITHUB_SHA)
 curl -X POST "$DISCORD_WEBHOOK" \
   -H "Content-Type: application/json" \
   -d "{
-    \"content\": \"$EMOJI **<@1078639209167990814> CI/CD Update** $EMOJI\",
+    \"content\": \"$EMOJI **<@1477290094112145458> CI/CD Update** $EMOJI\",
     \"embeds\": [{
       \"title\": \"$TITLE\",
       \"description\": \"**Repository:** \`$GITHUB_REPOSITORY\`\\n**Job:** \`$JOB_NAME\`\\n**Branch:** \`$GITHUB_REF_NAME\`\",
