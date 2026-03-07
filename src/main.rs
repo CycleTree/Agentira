@@ -5,6 +5,7 @@ mod ui_effects;
 use cool_ui_system::*;
 use ui_effects::*;
 
+// Fish Cake Kitchen - AI Cooking Simulation Game
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
