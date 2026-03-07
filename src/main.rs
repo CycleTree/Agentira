@@ -2,8 +2,10 @@ use bevy::prelude::*;
 
 mod cool_ui_system;
 mod ui_effects;
+mod cute_agents;
 use cool_ui_system::*;
 use ui_effects::*;
+use cute_agents::*;
 
 // Fish Cake Kitchen - AI Cooking Simulation Game
 fn main() {
@@ -28,6 +30,7 @@ fn main() {
             update_particle_effects,
             update_floating_text,
             update_ui_glow_effects,
+            animate_cute_chefs,
         ))
         .run();
 }
@@ -58,6 +61,8 @@ enum CookingStep {
 
 // === コンポーネント ===
 
+// 旧Chef構造体 - CuteChefに置き換え済み
+/*
 #[derive(Component)]
 struct Chef {
     speed: f32,
@@ -65,6 +70,7 @@ struct Chef {
     carrying_item: Option<String>,
     target_station: Option<Entity>,
 }
+*/
 
 #[derive(Component)]
 struct CookingStation {
@@ -126,10 +132,22 @@ fn setup_kitchen(
     // キッチンレイアウト作成
     spawn_kitchen_layout(&mut commands, &mut meshes, &mut materials);
     
-    // AI料理人スポーン（3人）
-    for i in 0..3 {
-        let position = Vec3::new(-2.0 + i as f32 * 2.0, 0.5, -3.0);
-        spawn_chef(&mut commands, &mut meshes, &mut materials, position, format!("Chef {}", i + 1));
+    // AI料理人スポーン（可愛い3人のシェフ、異なるパーソナリティ）
+    let personalities = [
+        (ChefPersonality::Energetic, "Chef Akira", Vec3::new(-2.0, 0.5, -3.0)),
+        (ChefPersonality::Gentle, "Chef Sakura", Vec3::new(0.0, 0.5, -3.0)),
+        (ChefPersonality::Cool, "Chef Rei", Vec3::new(2.0, 0.5, -3.0)),
+    ];
+    
+    for (personality, name, position) in personalities {
+        spawn_cute_chef(
+            &mut commands, 
+            &mut meshes, 
+            &mut materials, 
+            position,
+            name.to_string(),
+            personality
+        );
     }
     
     // フィッシュケーキレシピの初期化
@@ -185,6 +203,8 @@ fn spawn_kitchen_layout(
     spawn_serving_area(commands, meshes, materials, Vec3::new(0.0, 0.5, 4.0));
 }
 
+// 旧spawn_chef関数 - spawn_cute_chefに置き換え済み
+/*
 fn spawn_chef(
     commands: &mut Commands,
     meshes: &mut ResMut<Assets<Mesh>>,
@@ -192,53 +212,9 @@ fn spawn_chef(
     position: Vec3,
     _name: String,
 ) {
-    let chef_body_material = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.9, 0.9, 0.9), // 白いコック服
-        metallic: 0.0,
-        perceptual_roughness: 0.8,
-        ..default()
-    });
-    
-    let chef_hat_material = materials.add(StandardMaterial {
-        base_color: Color::srgb(1.0, 1.0, 1.0), // 白いコック帽
-        metallic: 0.0,
-        perceptual_roughness: 0.9,
-        ..default()
-    });
-    
-    commands.spawn((
-        Transform::from_translation(position),
-        GlobalTransform::default(),
-        Visibility::default(),
-        Chef {
-            speed: 2.5,
-            current_task: None,
-            carrying_item: None,
-            target_station: None,
-        },
-    )).with_children(|parent| {
-        // 体
-        parent.spawn((
-            Mesh3d(meshes.add(Cuboid::new(0.6, 1.0, 0.4))),
-            MeshMaterial3d(chef_body_material.clone()),
-            Transform::from_xyz(0.0, 0.5, 0.0),
-        ));
-        
-        // 頭
-        parent.spawn((
-            Mesh3d(meshes.add(Cuboid::new(0.5, 0.5, 0.5))),
-            MeshMaterial3d(materials.add(Color::srgb(0.9, 0.7, 0.6))), // 肌色
-            Transform::from_xyz(0.0, 1.2, 0.0),
-        ));
-        
-        // コック帽
-        parent.spawn((
-            Mesh3d(meshes.add(Cuboid::new(0.6, 0.4, 0.6))),
-            MeshMaterial3d(chef_hat_material),
-            Transform::from_xyz(0.0, 1.6, 0.0),
-        ));
-    });
+    // 旧コードコメントアウト - 新しいキュートエージェントシステムを使用
 }
+*/
 
 // === 各キッチン設備のスポーン関数 ===
 
@@ -394,84 +370,62 @@ fn spawn_serving_area(
 
 // === システム ===
 
+// 簡略化されたChef behavior（CuteChef用）
 fn chef_behavior(
     time: Res<Time>,
-    mut chefs: Query<(&mut Transform, &mut Chef)>,
-    stations: Query<(Entity, &Transform, &CookingStation), (Without<Chef>,)>,
+    mut chefs: Query<(&mut Transform, &mut CuteChef)>,
+    stations: Query<(Entity, &Transform, &CookingStation), (Without<CuteChef>,)>,
     kitchen_state: Res<KitchenState>,
 ) {
+    // 可愛いシェフたちのシンプルな行動
     for (mut transform, mut chef) in &mut chefs {
-        // 現在のタスクがない場合、新しいタスクを取得
+        chef.animation_timer += time.delta_secs();
+        
+        // 現在のタスクがない場合、新しいタスクを設定
         if chef.current_task.is_none() {
             if let Some(recipe) = kitchen_state.current_recipes.get(0) {
                 if !recipe.completed && recipe.current_step < recipe.steps.len() {
-                    chef.current_task = Some(recipe.steps[recipe.current_step].clone());
+                    let step_name = match &recipe.steps[recipe.current_step] {
+                        CookingStep::GetIngredient(ingredient) => format!("Getting {}", ingredient),
+                        CookingStep::Chop => "Chopping".to_string(),
+                        CookingStep::Fry => "Frying".to_string(),
+                        CookingStep::Bake => "Baking".to_string(),
+                    };
+                    chef.current_task = Some(step_name);
                 }
             }
         }
         
-        // タスクに基づいて行動
+        // タスクがある場合は対応するステーションに向かう
         if let Some(task) = &chef.current_task {
-            match task {
-                CookingStep::GetIngredient(ingredient) => {
-                    // 冷蔵庫に向かう
-                    if let Some((_, station_transform, _)) = stations
-                        .iter()
-                        .find(|(_, _, station)| matches!(station.station_type, StationType::Refrigerator))
-                    {
-                        let direction = (station_transform.translation - transform.translation).normalize_or_zero();
-                        transform.translation += direction * chef.speed * time.delta_secs();
-                        
-                        if transform.translation.distance(station_transform.translation) < 1.5 {
-                            chef.carrying_item = Some(ingredient.clone());
-                            chef.current_task = None;
-                        }
-                    }
-                }
-                CookingStep::Chop => {
-                    // カウンターに向かう
-                    if let Some((_, station_transform, _)) = stations
-                        .iter()
-                        .find(|(_, _, station)| matches!(station.station_type, StationType::Counter))
-                    {
-                        let direction = (station_transform.translation - transform.translation).normalize_or_zero();
-                        transform.translation += direction * chef.speed * time.delta_secs();
-                        
-                        if transform.translation.distance(station_transform.translation) < 1.5 {
-                            // 切る作業を実行
-                            chef.current_task = None;
-                        }
-                    }
-                }
-                CookingStep::Fry => {
-                    // コンロに向かう
-                    if let Some((_, station_transform, _)) = stations
-                        .iter()
-                        .find(|(_, _, station)| matches!(station.station_type, StationType::Stove))
-                    {
-                        let direction = (station_transform.translation - transform.translation).normalize_or_zero();
-                        transform.translation += direction * chef.speed * time.delta_secs();
-                        
-                        if transform.translation.distance(station_transform.translation) < 1.5 {
-                            chef.current_task = None;
-                        }
-                    }
-                }
-                CookingStep::Bake => {
-                    // オーブンに向かう
-                    if let Some((_, station_transform, _)) = stations
-                        .iter()
-                        .find(|(_, _, station)| matches!(station.station_type, StationType::Oven))
-                    {
-                        let direction = (station_transform.translation - transform.translation).normalize_or_zero();
-                        transform.translation += direction * chef.speed * time.delta_secs();
-                        
-                        if transform.translation.distance(station_transform.translation) < 1.5 {
-                            chef.current_task = None;
-                        }
-                    }
+            let target_station = if task.contains("Getting") {
+                StationType::Refrigerator
+            } else if task.contains("Chopping") {
+                StationType::Counter
+            } else if task.contains("Frying") {
+                StationType::Stove
+            } else if task.contains("Baking") {
+                StationType::Oven
+            } else {
+                StationType::Counter
+            };
+            
+            if let Some((_, station_transform, _)) = stations
+                .iter()
+                .find(|(_, _, station)| station.station_type == target_station)
+            {
+                let direction = (station_transform.translation - transform.translation).normalize_or_zero();
+                transform.translation += direction * chef.speed * 0.5 * time.delta_secs();
+                
+                if transform.translation.distance(station_transform.translation) < 2.0 {
+                    chef.current_task = None;
                 }
             }
+        } else {
+            // タスクがない時は可愛い巡回動作
+            let patrol_movement = (chef.animation_timer * 0.3).sin() * 0.8 * time.delta_secs();
+            transform.translation.x += patrol_movement;
+            transform.translation.z += (chef.animation_timer * 0.2).cos() * 0.5 * time.delta_secs();
         }
     }
 }
@@ -480,7 +434,7 @@ fn cooking_system(
     // 料理プロセスの管理
     mut kitchen_state: ResMut<KitchenState>,
     mut commands: Commands,
-    chefs: Query<&Chef>,
+    chefs: Query<&CuteChef>,
 ) {
     // すべてのシェフがタスクを完了したら次のステップに進む
     let active_tasks: Vec<_> = chefs.iter().filter_map(|chef| chef.current_task.as_ref()).collect();
