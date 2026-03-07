@@ -324,7 +324,7 @@ fn setup(
         commands.spawn((
             Mesh3d(meshes.add(Cuboid::new(32.0, 0.02, if is_major { 0.04 } else { 0.02 }))), 
             MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: Color::srgba(color.red(), color.green(), color.blue(), alpha),
+                base_color: { let c: LinearRgba = color.into(); Color::srgba(c.red, c.green, c.blue, alpha) },
                 emissive,
                 unlit: true,
                 ..default()
@@ -336,7 +336,7 @@ fn setup(
         commands.spawn((
             Mesh3d(meshes.add(Cuboid::new(if is_major { 0.04 } else { 0.02 }, 0.02, 32.0))), 
             MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: Color::srgba(color.red(), color.green(), color.blue(), alpha),
+                base_color: { let c: LinearRgba = color.into(); Color::srgba(c.red, c.green, c.blue, alpha) },
                 emissive,
                 unlit: true,
                 ..default()
@@ -589,7 +589,7 @@ fn update_trails(
                     Mesh3d(meshes.add(Sphere::new(scale))),
                     MeshMaterial3d(materials.add(StandardMaterial {
                         base_color: color,
-                        emissive: LinearRgba::new(color.red(), color.green(), color.blue(), 0.8),
+                        emissive: { let c: LinearRgba = color.into(); LinearRgba::new(c.red, c.green, c.blue, 0.8) },
                         alpha_mode: bevy::prelude::AlphaMode::Blend,
                         unlit: true,
                         ..default()
